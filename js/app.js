@@ -43,7 +43,7 @@ document.addEventListener("DOMContentLoaded", () => {
   function initPlaceOfSupplyDropdown() {
     const posSelect = document.getElementById("place-of-supply");
     if (!posSelect) return;
-    posSelect.innerHTML = Object.entries(GSTRules.STATE_CODES).map(([code, name]) => `
+    posSelect.innerHTML = `<option value="">-- Select Place of Supply (State) --</option>` + Object.entries(GSTRules.STATE_CODES).map(([code, name]) => `
       <option value="${code} - ${name}">${code} - ${name}</option>
     `).join("");
     posSelect.addEventListener("change", () => {
@@ -55,15 +55,21 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function updateSupplyNatureBadge() {
     const sGstin = document.getElementById("supplier-gstin").value.trim();
-    const sCode = sGstin.length >= 2 ? sGstin.substring(0, 2) : "27";
     const posSelect = document.getElementById("place-of-supply");
-    const posVal = posSelect && posSelect.value ? posSelect.value.substring(0, 2) : sCode;
-    const isIntra = (sCode === posVal);
+    const posVal = posSelect && posSelect.value ? posSelect.value.substring(0, 2) : "";
     const badge = document.getElementById("supply-nature-badge");
-    if (badge) {
-      badge.className = `badge ${isIntra ? 'badge-info' : 'badge-warn'}`;
-      badge.textContent = isIntra ? "INTRA-STATE (CGST+SGST)" : "INTER-STATE (IGST)";
+    if (!badge) return;
+
+    if (!sGstin || !posVal) {
+      badge.className = "badge badge-info";
+      badge.textContent = "SUPPLY NATURE PENDING";
+      return;
     }
+
+    const sCode = sGstin.substring(0, 2);
+    const isIntra = (sCode === posVal);
+    badge.className = `badge ${isIntra ? 'badge-info' : 'badge-warn'}`;
+    badge.textContent = isIntra ? "INTRA-STATE (CGST+SGST)" : "INTER-STATE (IGST)";
   }
 
   // --- THEME CONTROLLER (LOCKED TO CLASSIC WARM WHITE / IVORY) ---
@@ -149,15 +155,16 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function createNewBlankInvoice() {
     AppState.activeInvoice = {
-      invoiceNumber: "INV/" + new Date().getFullYear() + "/001",
-      invoiceDate: new Date().toISOString().slice(0, 10),
+      invoiceNumber: "",
+      invoiceDate: "",
       invoiceType: "B2B",
+      ewayBillNo: "",
       supplierName: "",
       supplierGstin: "",
-      supplierStateCode: "27",
+      supplierStateCode: "",
       recipientName: "",
       recipientGstin: "",
-      placeOfSupply: "27 - Maharashtra",
+      placeOfSupply: "",
       isRcm: false,
       irn: "",
       taxableAmount: 0,
@@ -167,13 +174,13 @@ document.addEventListener("DOMContentLoaded", () => {
       roundOff: 0,
       totalAmount: 0,
       items: [
-        { description: "", hsn: "", qty: 1, rate: 0, discount: 0, taxRate: 18 }
+        { description: "", hsn: "", qty: 1, rate: "", discount: "", taxRate: 18 }
       ]
     };
     populateFormWithInvoice(AppState.activeInvoice);
     runLiveAudit();
     switchToTab("inspector");
-    showToast("Opened fresh blank invoice. Enter your details to audit.", "info");
+    showToast("Opened clean blank invoice. Fill in details to audit.", "info");
   }
 
   function parseAndLoadSingleInvoiceFile(content, fileName) {
@@ -448,6 +455,8 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("inv-number").value = inv.invoiceNumber || "";
     document.getElementById("inv-date").value = inv.invoiceDate || "";
     document.getElementById("inv-type").value = inv.invoiceType || "B2B";
+    const ewbInput = document.getElementById("inv-eway-bill");
+    if (ewbInput) ewbInput.value = inv.ewayBillNo || "";
     document.getElementById("supplier-name").value = inv.supplierName || "";
     document.getElementById("supplier-gstin").value = inv.supplierGstin || "";
     document.getElementById("recipient-name").value = inv.recipientName || "";
@@ -456,12 +465,19 @@ document.addEventListener("DOMContentLoaded", () => {
     // Select Place of Supply by code prefix
     const posSelect = document.getElementById("place-of-supply");
     if (posSelect) {
-      const posTarget = String(inv.placeOfSupply || "27").substring(0, 2);
-      for (let i = 0; i < posSelect.options.length; i++) {
-        if (posSelect.options[i].value.startsWith(posTarget)) {
-          posSelect.selectedIndex = i;
-          break;
+      if (!inv.placeOfSupply) {
+        posSelect.value = "";
+      } else {
+        const posTarget = String(inv.placeOfSupply).substring(0, 2);
+        let matched = false;
+        for (let i = 0; i < posSelect.options.length; i++) {
+          if (posSelect.options[i].value.startsWith(posTarget)) {
+            posSelect.selectedIndex = i;
+            matched = true;
+            break;
+          }
         }
+        if (!matched) posSelect.value = "";
       }
     }
     updateSupplyNatureBadge();
@@ -472,13 +488,14 @@ document.addEventListener("DOMContentLoaded", () => {
     // Line items
     renderLineItemsTable(inv.items || []);
 
-    // Summary numbers
-    document.getElementById("inv-taxable").value = Number(inv.taxableAmount || 0).toFixed(2);
-    document.getElementById("inv-cgst").value = Number(inv.cgst || 0).toFixed(2);
-    document.getElementById("inv-sgst").value = Number(inv.sgst || 0).toFixed(2);
-    document.getElementById("inv-igst").value = Number(inv.igst || 0).toFixed(2);
-    document.getElementById("inv-roundoff").value = Number(inv.roundOff || 0).toFixed(2);
-    document.getElementById("inv-total").value = Number(inv.totalAmount || 0).toFixed(2);
+    // Summary numbers - leave blank if this is an empty draft
+    const isBlank = (!inv.supplierGstin && !inv.recipientGstin && (!inv.taxableAmount || Number(inv.taxableAmount) === 0));
+    document.getElementById("inv-taxable").value = (!isBlank && inv.taxableAmount !== undefined && inv.taxableAmount !== null && inv.taxableAmount !== "") ? Number(inv.taxableAmount || 0).toFixed(2) : "";
+    document.getElementById("inv-cgst").value = (!isBlank && inv.cgst !== undefined && inv.cgst !== null && inv.cgst !== "") ? Number(inv.cgst || 0).toFixed(2) : "";
+    document.getElementById("inv-sgst").value = (!isBlank && inv.sgst !== undefined && inv.sgst !== null && inv.sgst !== "") ? Number(inv.sgst || 0).toFixed(2) : "";
+    document.getElementById("inv-igst").value = (!isBlank && inv.igst !== undefined && inv.igst !== null && inv.igst !== "") ? Number(inv.igst || 0).toFixed(2) : "";
+    document.getElementById("inv-roundoff").value = (!isBlank && inv.roundOff !== undefined && inv.roundOff !== null && inv.roundOff !== "") ? Number(inv.roundOff || 0).toFixed(2) : "";
+    document.getElementById("inv-total").value = (!isBlank && inv.totalAmount !== undefined && inv.totalAmount !== null && inv.totalAmount !== "") ? Number(inv.totalAmount || 0).toFixed(2) : "";
   }
 
   // --- LINE ITEMS TABLE CONTROLLER ---
@@ -489,12 +506,14 @@ document.addEventListener("DOMContentLoaded", () => {
     tbody.innerHTML = "";
     items.forEach((item, index) => {
       const tr = document.createElement("tr");
+      const rateVal = (item.rate !== undefined && item.rate !== null && item.rate !== "" && Number(item.rate) > 0) ? item.rate : (item.rate === 0 ? "0" : "");
+      const discVal = (item.discount !== undefined && item.discount !== null && item.discount !== "" && Number(item.discount) > 0) ? item.discount : "";
       tr.innerHTML = `
-        <td><input type="text" class="item-desc" value="${item.description || ''}" placeholder="Description"></td>
+        <td><input type="text" class="item-desc" value="${item.description || ''}" placeholder="e.g. Professional Services"></td>
         <td><input type="text" class="item-hsn" value="${item.hsn || ''}" placeholder="HSN/SAC" style="width: 80px;"></td>
-        <td><input type="number" class="item-qty" value="${item.qty || 1}" min="1" step="1" style="width: 55px;"></td>
-        <td><input type="number" class="item-rate" value="${item.rate || 0}" min="0" step="0.01" style="width: 85px;"></td>
-        <td><input type="number" class="item-discount" value="${item.discount || 0}" min="0" step="0.01" style="width: 70px;"></td>
+        <td><input type="number" class="item-qty" value="${item.qty !== undefined && item.qty !== '' ? item.qty : 1}" min="1" step="1" style="width: 55px;"></td>
+        <td><input type="number" class="item-rate" value="${rateVal}" placeholder="0.00" min="0" step="0.01" style="width: 85px;"></td>
+        <td><input type="number" class="item-discount" value="${discVal}" placeholder="0.00" min="0" step="0.01" style="width: 70px;"></td>
         <td>
           <select class="item-taxrate" style="width: 75px;">
             ${[0, 0.1, 0.25, 1.5, 3, 5, 12, 14, 18, 28].map(r => `
@@ -662,27 +681,37 @@ document.addEventListener("DOMContentLoaded", () => {
     const audit = GSTValidator.auditInvoice(AppState.activeInvoice);
     AppState.activeAudit = audit;
 
+    const isDraft = Boolean(audit.isDraft || audit.status === "DRAFT");
+
     // Render Health Score & Circle
     const scoreCircle = document.getElementById("audit-gauge-circle");
     const scoreNum = document.getElementById("audit-score-num");
     const statusText = document.getElementById("audit-status-text");
     const statusDesc = document.getElementById("audit-status-desc");
 
-    scoreNum.textContent = audit.score;
-
     scoreCircle.className = "gauge-circle";
-    if (audit.score >= 90) {
+
+    if (isDraft) {
+      scoreNum.textContent = "—";
+      scoreCircle.style.borderColor = "var(--primary-navy)";
+      statusText.style.color = "var(--primary-navy)";
+      statusText.textContent = "Ready for Entry";
+      statusDesc.textContent = "New invoice voucher ready. Fill in details to perform automated statutory audit.";
+    } else if (audit.score >= 90) {
+      scoreNum.textContent = audit.score;
       scoreCircle.style.borderColor = "var(--emerald-green)";
       statusText.style.color = "var(--emerald-green)";
       statusText.textContent = "All Checks Passed";
       statusDesc.textContent = "Invoice complies with GST invoicing rules and all calculations match.";
     } else if (audit.score >= 60) {
+      scoreNum.textContent = audit.score;
       scoreCircle.classList.add("warn");
       scoreCircle.style.borderColor = "var(--amber-warn)";
       statusText.style.color = "var(--amber-warn)";
       statusText.textContent = "Minor Warnings Detected";
       statusDesc.textContent = "Invoice has non-blocking warnings, but tax split and totals are balanced.";
     } else {
+      scoreNum.textContent = audit.score;
       scoreCircle.classList.add("fail");
       scoreCircle.style.borderColor = "var(--rose-red)";
       statusText.style.color = "var(--rose-red)";
@@ -692,60 +721,98 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Auto-fix button visibility
     const autoFixBtn = document.getElementById("btn-autofix");
-    const hasFixable = audit.violations.some(v => v.autoFixable);
+    const hasFixable = !isDraft && audit.violations.some(v => v.autoFixable);
     if (autoFixBtn) {
       autoFixBtn.style.display = hasFixable ? "inline-flex" : "none";
     }
 
     // Render Violations & Pass List
     const violationsContainer = document.getElementById("violations-container");
-    if (!violationsContainer) return;
+    if (violationsContainer) {
+      violationsContainer.innerHTML = "";
 
-    violationsContainer.innerHTML = "";
-
-    if (audit.violations.length === 0) {
-      violationsContainer.innerHTML = `
-        <div class="violation-card pass">
-          <div class="violation-header">
-            <span class="violation-title">✓ All 10 Statutory GST Rules Cleared</span>
-            <span class="badge badge-pass">PASSED</span>
+      if (isDraft) {
+        violationsContainer.innerHTML = `
+          <div class="violation-card pass" style="border-left-color: var(--primary-navy);">
+            <div class="violation-header">
+              <span class="violation-title">ℹ️ Blank Workstation — Ready for Entry</span>
+              <span class="badge badge-info">DRAFT</span>
+            </div>
+            <div class="violation-desc">Enter supplier &amp; buyer details, line items with rates, and Place of Supply to trigger real-time statutory audit.</div>
           </div>
-          <div class="violation-desc">GSTIN check digits, Place of Supply tax split, HSN codes, line item math, and round-off are verified.</div>
-        </div>
-      `;
-    } else {
-      audit.violations.forEach(v => {
-        const card = document.createElement("div");
-        card.className = `violation-card ${v.severity.toLowerCase()}`;
-        card.innerHTML = `
-          <div class="violation-header">
-            <span class="violation-title">${v.severity === 'CRITICAL' ? '⛔' : '⚠️'} ${v.title}</span>
-            <span class="badge ${v.severity === 'CRITICAL' ? 'badge-fail' : 'badge-warn'}">${v.severity}</span>
-          </div>
-          <div class="violation-desc">${v.desc}</div>
-          ${v.fixHint ? `<div class="violation-fix">💡 Suggested Action: ${v.fixHint}</div>` : ''}
         `;
-        violationsContainer.appendChild(card);
-      });
+      } else if (audit.violations.length === 0) {
+        violationsContainer.innerHTML = `
+          <div class="violation-card pass">
+            <div class="violation-header">
+              <span class="violation-title">✓ All 10 Statutory GST Rules Cleared</span>
+              <span class="badge badge-pass">PASSED</span>
+            </div>
+            <div class="violation-desc">GSTIN check digits, Place of Supply tax split, HSN codes, line item math, and round-off are verified.</div>
+          </div>
+        `;
+      } else {
+        audit.violations.forEach(v => {
+          const card = document.createElement("div");
+          card.className = `violation-card ${v.severity.toLowerCase()}`;
+          card.innerHTML = `
+            <div class="violation-header">
+              <span class="violation-title">${v.severity === 'CRITICAL' ? '⛔' : '⚠️'} ${v.title}</span>
+              <span class="badge ${v.severity === 'CRITICAL' ? 'badge-fail' : 'badge-warn'}">${v.severity}</span>
+            </div>
+            <div class="violation-desc">${v.desc}</div>
+            ${v.fixHint ? `<div class="violation-fix">💡 Suggested Action: ${v.fixHint}</div>` : ''}
+          `;
+          violationsContainer.appendChild(card);
+        });
+      }
     }
 
     // Synchronize Top KPI Cards for Single Invoice
     const totalGst = (Number(AppState.activeInvoice.cgst || 0) + Number(AppState.activeInvoice.sgst || 0) + Number(AppState.activeInvoice.igst || 0));
-    const critErrors = audit.violations.filter(v => v.severity === 'CRITICAL').length;
+    const critErrors = isDraft ? 0 : audit.violations.filter(v => v.severity === 'CRITICAL').length;
 
+    const kpiStatusBadge = document.getElementById("kpi-status-badge");
     const kpiRate = document.getElementById("kpi-compliance-rate");
     const kpiInvoices = document.getElementById("kpi-total-invoices");
     const kpiTaxable = document.getElementById("kpi-taxable-val");
     const kpiGst = document.getElementById("kpi-assessed-gst");
     const kpiErrors = document.getElementById("kpi-critical-errors");
 
-    if (kpiRate) kpiRate.textContent = `${audit.score}%`;
-    if (kpiInvoices) kpiInvoices.textContent = "1 Active";
-    if (kpiTaxable) kpiTaxable.textContent = `₹${Number(AppState.activeInvoice.taxableAmount || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-    if (kpiGst) kpiGst.textContent = `₹${totalGst.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-    if (kpiErrors) {
-      kpiErrors.textContent = `${critErrors} Error${critErrors === 1 ? '' : 's'}`;
-      kpiErrors.style.color = critErrors > 0 ? "var(--rose-red)" : "var(--emerald-green)";
+    if (isDraft) {
+      if (kpiStatusBadge) {
+        kpiStatusBadge.className = "badge badge-info";
+        kpiStatusBadge.textContent = "Draft";
+      }
+      if (kpiRate) kpiRate.textContent = "Ready";
+      if (kpiInvoices) kpiInvoices.textContent = "1 Active";
+      if (kpiTaxable) kpiTaxable.textContent = "₹0.00";
+      if (kpiGst) kpiGst.textContent = "₹0.00";
+      if (kpiErrors) {
+        kpiErrors.textContent = "0 Errors";
+        kpiErrors.style.color = "var(--emerald-green)";
+      }
+    } else {
+      if (kpiStatusBadge) {
+        if (audit.score >= 90) {
+          kpiStatusBadge.className = "badge badge-pass";
+          kpiStatusBadge.textContent = "Pass";
+        } else if (audit.score >= 60) {
+          kpiStatusBadge.className = "badge badge-warn";
+          kpiStatusBadge.textContent = "Warning";
+        } else {
+          kpiStatusBadge.className = "badge badge-fail";
+          kpiStatusBadge.textContent = "Fail";
+        }
+      }
+      if (kpiRate) kpiRate.textContent = `${audit.score}%`;
+      if (kpiInvoices) kpiInvoices.textContent = "1 Active";
+      if (kpiTaxable) kpiTaxable.textContent = `₹${Number(AppState.activeInvoice.taxableAmount || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      if (kpiGst) kpiGst.textContent = `₹${totalGst.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      if (kpiErrors) {
+        kpiErrors.textContent = `${critErrors} Error${critErrors === 1 ? '' : 's'}`;
+        kpiErrors.style.color = critErrors > 0 ? "var(--rose-red)" : "var(--emerald-green)";
+      }
     }
 
     // Update Form Badges (GSTIN checks)
@@ -757,7 +824,11 @@ document.addEventListener("DOMContentLoaded", () => {
     // Update Amount in Words (Mandatory Legal Clause)
     const wordsEl = document.getElementById("amount-in-words-text");
     if (wordsEl) {
-      wordsEl.textContent = GSTRules.numberToIndianWords(AppState.activeInvoice.totalAmount || 0);
+      if (isDraft || !AppState.activeInvoice.totalAmount) {
+        wordsEl.textContent = "Awaiting invoice totals...";
+      } else {
+        wordsEl.textContent = GSTRules.numberToIndianWords(AppState.activeInvoice.totalAmount || 0);
+      }
     }
 
     // Update Financial Period
@@ -771,33 +842,33 @@ document.addEventListener("DOMContentLoaded", () => {
       const gstinBar = document.getElementById("subscore-gstin-bar");
       const gstinTxt = document.getElementById("subscore-gstin-text");
       if (gstinBar && gstinTxt) {
-        gstinTxt.textContent = `${audit.scores.gstin}%`;
-        gstinBar.style.width = `${audit.scores.gstin}%`;
-        gstinBar.className = `score-bar-fill ${audit.scores.gstin >= 90 ? 'pass' : (audit.scores.gstin >= 60 ? 'warn' : 'fail')}`;
+        gstinTxt.textContent = isDraft ? "—" : `${audit.scores.gstin}%`;
+        gstinBar.style.width = isDraft ? "0%" : `${audit.scores.gstin}%`;
+        gstinBar.className = `score-bar-fill ${isDraft ? '' : (audit.scores.gstin >= 90 ? 'pass' : (audit.scores.gstin >= 60 ? 'warn' : 'fail'))}`;
       }
 
       const posBar = document.getElementById("subscore-pos-bar");
       const posTxt = document.getElementById("subscore-pos-text");
       if (posBar && posTxt) {
-        posTxt.textContent = `${audit.scores.pos}%`;
-        posBar.style.width = `${audit.scores.pos}%`;
-        posBar.className = `score-bar-fill ${audit.scores.pos >= 90 ? 'pass' : (audit.scores.pos >= 60 ? 'warn' : 'fail')}`;
+        posTxt.textContent = isDraft ? "—" : `${audit.scores.pos}%`;
+        posBar.style.width = isDraft ? "0%" : `${audit.scores.pos}%`;
+        posBar.className = `score-bar-fill ${isDraft ? '' : (audit.scores.pos >= 90 ? 'pass' : (audit.scores.pos >= 60 ? 'warn' : 'fail'))}`;
       }
 
       const mathBar = document.getElementById("subscore-math-bar");
       const mathTxt = document.getElementById("subscore-math-text");
       if (mathBar && mathTxt) {
-        mathTxt.textContent = `${audit.scores.math}%`;
-        mathBar.style.width = `${audit.scores.math}%`;
-        mathBar.className = `score-bar-fill ${audit.scores.math >= 90 ? 'pass' : (audit.scores.math >= 60 ? 'warn' : 'fail')}`;
+        mathTxt.textContent = isDraft ? "—" : `${audit.scores.math}%`;
+        mathBar.style.width = isDraft ? "0%" : `${audit.scores.math}%`;
+        mathBar.className = `score-bar-fill ${isDraft ? '' : (audit.scores.math >= 90 ? 'pass' : (audit.scores.math >= 60 ? 'warn' : 'fail'))}`;
       }
 
       const statBar = document.getElementById("subscore-statutory-bar");
       const statTxt = document.getElementById("subscore-statutory-text");
       if (statBar && statTxt) {
-        statTxt.textContent = `${audit.scores.statutory}%`;
-        statBar.style.width = `${audit.scores.statutory}%`;
-        statBar.className = `score-bar-fill ${audit.scores.statutory >= 90 ? 'pass' : (audit.scores.statutory >= 60 ? 'warn' : 'fail')}`;
+        statTxt.textContent = isDraft ? "—" : `${audit.scores.statutory}%`;
+        statBar.style.width = isDraft ? "0%" : `${audit.scores.statutory}%`;
+        statBar.className = `score-bar-fill ${isDraft ? '' : (audit.scores.statutory >= 90 ? 'pass' : (audit.scores.statutory >= 60 ? 'warn' : 'fail'))}`;
       }
     }
   }
@@ -805,11 +876,15 @@ document.addEventListener("DOMContentLoaded", () => {
   function updateITCChecklist(audit) {
     const sGstin = document.getElementById("supplier-gstin").value.trim();
     const sCheck = GSTRules.verifyGSTINChecksum(sGstin);
-    const hasCritical = audit.violations.some(v => v.severity === "CRITICAL");
+    const isDraft = Boolean(audit && (audit.isDraft || audit.status === "DRAFT"));
+    const hasCritical = audit && audit.violations && audit.violations.some(v => v.severity === "CRITICAL");
 
     const itcBadge = document.getElementById("itc-eligibility-badge");
     if (itcBadge) {
-      if (!hasCritical && sCheck.isValid) {
+      if (isDraft) {
+        itcBadge.className = "badge badge-info";
+        itcBadge.textContent = "Awaiting Data";
+      } else if (!hasCritical && sCheck.isValid) {
         itcBadge.className = "badge badge-pass";
         itcBadge.textContent = "Eligible for ITC";
       } else {
@@ -820,46 +895,66 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const chkGstin = document.getElementById("itc-chk-gstin");
     if (chkGstin) {
-      chkGstin.innerHTML = sCheck.isValid
-        ? `<span>✅</span> Tax invoice specifies valid 15-digit GSTIN (${sCheck.stateCode})`
-        : `<span>❌</span> Supplier GSTIN check digit invalid`;
+      if (isDraft) {
+        chkGstin.innerHTML = `<span>⏳</span> Enter 15-digit supplier GSTIN`;
+      } else {
+        chkGstin.innerHTML = sCheck.isValid
+          ? `<span>✅</span> Tax invoice specifies valid 15-digit GSTIN (${sCheck.stateCode})`
+          : `<span>❌</span> Supplier GSTIN check digit invalid`;
+      }
     }
 
     const chkSplit = document.getElementById("itc-chk-taxsplit");
     if (chkSplit) {
-      const hasSplitError = audit.violations.some(v => v.ruleId && v.ruleId.includes("POS"));
-      chkSplit.innerHTML = !hasSplitError
-        ? `<span>✅</span> Place of Supply (POS) matches tax split`
-        : `<span>❌</span> Tax split mismatch (CGST/SGST vs IGST)`;
+      if (isDraft) {
+        chkSplit.innerHTML = `<span>⏳</span> Select Place of Supply (POS)`;
+      } else {
+        const hasSplitError = audit.violations.some(v => v.ruleId && v.ruleId.includes("POS"));
+        chkSplit.innerHTML = !hasSplitError
+          ? `<span>✅</span> Place of Supply (POS) matches tax split`
+          : `<span>❌</span> Tax split mismatch (CGST/SGST vs IGST)`;
+      }
     }
 
     const chkMath = document.getElementById("itc-chk-math");
     if (chkMath) {
-      const hasMathError = audit.violations.some(v => v.ruleId && (v.ruleId.includes("MATH") || v.ruleId.includes("TAXABLE") || v.ruleId.includes("TAX_AMOUNT")));
-      chkMath.innerHTML = !hasMathError
-        ? `<span>✅</span> Line item rates &amp; subtotal verified`
-        : `<span>❌</span> Subtotal calculation discrepancy`;
+      if (isDraft) {
+        chkMath.innerHTML = `<span>⏳</span> Add line items with rates &amp; taxes`;
+      } else {
+        const hasMathError = audit.violations.some(v => v.ruleId && (v.ruleId.includes("MATH") || v.ruleId.includes("TAXABLE") || v.ruleId.includes("TAX_AMOUNT")));
+        chkMath.innerHTML = !hasMathError
+          ? `<span>✅</span> Line item rates &amp; subtotal verified`
+          : `<span>❌</span> Subtotal calculation discrepancy`;
+      }
     }
 
     const chkRule46 = document.getElementById("itc-chk-rule46");
     if (chkRule46) {
-      const hasInvNumError = audit.violations.some(v => v.ruleId && (v.ruleId.includes("INVOICE_NUM") || v.ruleId.includes("FUTURE_DATE")));
-      chkRule46.innerHTML = !hasInvNumError
-        ? `<span>✅</span> Invoice number complies with Rule 46`
-        : `<span>❌</span> Rule 46 non-compliant invoice number/date`;
+      if (isDraft) {
+        chkRule46.innerHTML = `<span>⏳</span> Enter invoice number &amp; date`;
+      } else {
+        const hasInvNumError = audit.violations.some(v => v.ruleId && (v.ruleId.includes("INVOICE_NUM") || v.ruleId.includes("FUTURE_DATE")));
+        chkRule46.innerHTML = !hasInvNumError
+          ? `<span>✅</span> Invoice number complies with Rule 46`
+          : `<span>❌</span> Rule 46 non-compliant invoice number/date`;
+      }
     }
 
     const chkSec17 = document.getElementById("itc-chk-sec17");
     if (chkSec17) {
-      const hasSec17 = audit.violations.some(v => v.ruleId && v.ruleId.includes("SECTION_17_5"));
-      chkSec17.innerHTML = !hasSec17
-        ? `<span>✅</span> Cleared Section 17(5) blocked credit restrictions`
-        : `<span>⚠️</span> Warning: Potential restricted items under Section 17(5)`;
+      if (isDraft) {
+        chkSec17.innerHTML = `<span>⏳</span> Section 17(5) blocked credit verification`;
+      } else {
+        const hasSec17 = audit.violations.some(v => v.ruleId && v.ruleId.includes("SECTION_17_5"));
+        chkSec17.innerHTML = !hasSec17
+          ? `<span>✅</span> Cleared Section 17(5) blocked credit restrictions`
+          : `<span>⚠️</span> Warning: Potential restricted items under Section 17(5)`;
+      }
     }
   }
 
   function updateGSTINBadges() {
-    const sGstin = document.getElementById("supplier-gstin").value;
+    const sGstin = document.getElementById("supplier-gstin").value.trim();
     const sBadge = document.getElementById("supplier-gstin-badge");
     if (sBadge) {
       if (!sGstin) {
@@ -872,11 +967,16 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     }
 
-    const rGstin = document.getElementById("recipient-gstin").value;
+    const rGstin = document.getElementById("recipient-gstin").value.trim();
     const rBadge = document.getElementById("recipient-gstin-badge");
+    const invType = document.getElementById("inv-type") ? document.getElementById("inv-type").value : "B2B";
     if (rBadge) {
       if (!rGstin) {
-        rBadge.innerHTML = `<span class="badge badge-info">B2C Unregistered</span>`;
+        if (invType === "B2C") {
+          rBadge.innerHTML = `<span class="badge badge-info">B2C Unregistered</span>`;
+        } else {
+          rBadge.innerHTML = "";
+        }
       } else {
         const check = GSTRules.verifyGSTINChecksum(rGstin);
         rBadge.innerHTML = check.isValid

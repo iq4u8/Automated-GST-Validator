@@ -42,6 +42,40 @@ const GSTValidator = (() => {
       ? String(invoice.placeOfSupply).substring(0, 2)
       : (recipientGstin ? recipientGstin.substring(0, 2) : supplierStateCode);
 
+    // Check if this is a blank new invoice awaiting user entry (no false errors on empty form)
+    const hasItems = Array.isArray(invoice.items) && invoice.items.some(it => (Number(it.rate) > 0 || (it.description && String(it.description).trim() !== "")));
+    const isBlankDraft = (!supplierGstin || supplierGstin.trim() === "") && 
+                         (!recipientGstin || recipientGstin.trim() === "") && 
+                         (!invoice.taxableAmount || Number(invoice.taxableAmount) === 0) &&
+                         !hasItems;
+    if (isBlankDraft) {
+      return {
+        score: 100,
+        status: "DRAFT",
+        isDraft: true,
+        scores: { overall: 100, gstin: 100, pos: 100, math: 100, statutory: 100 },
+        violations: [],
+        passes: [{
+          ruleId: "DRAFT_READY",
+          title: "Workstation Ready for Entry",
+          desc: "New blank invoice opened. Enter supplier & buyer details, line items and taxes to begin live statutory audit."
+        }],
+        calculated: {
+          posEval: { isIntraState: true, type: "INTRA_STATE" },
+          computedTaxableSum: 0,
+          computedCgstSum: 0,
+          computedSgstSum: 0,
+          computedIgstSum: 0,
+          computedRoundOff: 0,
+          standardRoundedTotal: 0,
+          totalDeclaredTax: 0,
+          totalComputedTax: 0,
+          ewayCheck: { required: false, message: "" },
+          financialPeriod: GSTRules.getFinancialPeriod(invoiceDate)
+        }
+      };
+    }
+
     // --- RULE 1: Supplier GSTIN Checksum & Format ---
     if (!supplierGstin) {
       violations.push({
