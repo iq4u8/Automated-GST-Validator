@@ -17,10 +17,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // --- INITIALIZATION ---
   initTheme();
-  initPresetDropdown();
+  initPlaceOfSupplyDropdown();
+  initWorkstationActions();
   initLineItemsHandlers();
   initFormListeners();
   initTabs();
+  initHistoryTab();
   initBulkDropzone();
   initModalListeners();
   initLiveLookupHandlers();
@@ -30,51 +32,251 @@ document.addEventListener("DOMContentLoaded", () => {
   // Load Preset 1 by default
   loadScenarioById("preset_1");
 
-  // --- THEME CONTROLLER ---
-  function initTheme() {
-    document.documentElement.setAttribute("data-theme", AppState.theme);
-    const themeBtn = document.getElementById("theme-toggle-btn");
-    if (themeBtn) {
-      themeBtn.innerHTML = AppState.theme === "dark" ? "☀️" : "🌙";
-      themeBtn.addEventListener("click", () => {
-        AppState.theme = AppState.theme === "dark" ? "light" : "dark";
-        document.documentElement.setAttribute("data-theme", AppState.theme);
-        localStorage.setItem("gst_theme", AppState.theme);
-        themeBtn.innerHTML = AppState.theme === "dark" ? "☀️" : "🌙";
-        showToast(`Switched to ${AppState.theme} theme`, "info");
-      });
+  // --- PLACE OF SUPPLY INITIALIZATION ---
+  function initPlaceOfSupplyDropdown() {
+    const posSelect = document.getElementById("place-of-supply");
+    if (!posSelect) return;
+    posSelect.innerHTML = Object.entries(GSTRules.STATE_CODES).map(([code, name]) => `
+      <option value="${code} - ${name}">${code} - ${name}</option>
+    `).join("");
+    posSelect.addEventListener("change", () => {
+      collectFormData();
+      updateSupplyNatureBadge();
+      runLiveAudit();
+    });
+  }
+
+  function updateSupplyNatureBadge() {
+    const sGstin = document.getElementById("supplier-gstin").value.trim();
+    const sCode = sGstin.length >= 2 ? sGstin.substring(0, 2) : "27";
+    const posSelect = document.getElementById("place-of-supply");
+    const posVal = posSelect && posSelect.value ? posSelect.value.substring(0, 2) : sCode;
+    const isIntra = (sCode === posVal);
+    const badge = document.getElementById("supply-nature-badge");
+    if (badge) {
+      badge.className = `badge ${isIntra ? 'badge-info' : 'badge-warn'}`;
+      badge.textContent = isIntra ? "INTRA-STATE (CGST+SGST)" : "INTER-STATE (IGST)";
     }
   }
 
-  // --- TAB NAVIGATION ---
+  // --- THEME CONTROLLER (LOCKED TO CLASSIC WARM WHITE / IVORY) ---
+  function initTheme() {
+    document.documentElement.removeAttribute("data-theme");
+  }
+
+  // --- TAB NAVIGATION (4 WORKSPACES) ---
   function initTabs() {
     const tabBtns = document.querySelectorAll(".tab-btn");
     tabBtns.forEach(btn => {
       btn.addEventListener("click", () => {
         const targetTab = btn.getAttribute("data-tab");
-        tabBtns.forEach(b => b.classList.remove("active"));
-        document.querySelectorAll(".tab-content").forEach(c => c.classList.remove("active"));
-
-        btn.classList.add("active");
-        const activeContent = document.getElementById(`tab-${targetTab}`);
-        if (activeContent) activeContent.classList.add("active");
-
-        AppState.currentTab = targetTab;
+        switchToTab(targetTab);
       });
     });
   }
 
-  // --- PRESET SCENARIOS ---
-  function initPresetDropdown() {
-    const select = document.getElementById("preset-select");
-    if (!select) return;
+  function switchToTab(tabId) {
+    const tabBtns = document.querySelectorAll(".tab-btn");
+    tabBtns.forEach(b => {
+      if (b.getAttribute("data-tab") === tabId) b.classList.add("active");
+      else b.classList.remove("active");
+    });
 
-    select.innerHTML = SamplePresets.SCENARIOS.map(s => `
-      <option value="${s.id}">${s.name}</option>
-    `).join("");
+    document.querySelectorAll(".tab-content").forEach(c => c.classList.remove("active"));
+    const activeContent = document.getElementById(`tab-${tabId}`);
+    if (activeContent) activeContent.classList.add("active");
 
-    select.addEventListener("change", (e) => {
-      loadScenarioById(e.target.value);
+    AppState.currentTab = tabId;
+
+    if (tabId === "scenarios") {
+      renderScenariosGrid();
+    } else if (tabId === "history") {
+      renderAuditHistory();
+    }
+  }
+
+  // --- WORKSTATION ACTIONS (NEW INVOICE, FILE UPLOAD, SAVE AUDIT) ---
+  function initWorkstationActions() {
+    // New Invoice buttons
+    const newBtns = ["btn-header-new", "btn-new-invoice"];
+    newBtns.forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.addEventListener("click", createNewBlankInvoice);
+    });
+
+    // Upload Invoice File buttons
+    const uploadBtns = ["btn-header-upload", "btn-upload-file"];
+    const fileInput = document.getElementById("single-invoice-file-input");
+    uploadBtns.forEach(id => {
+      const el = document.getElementById(id);
+      if (el && fileInput) {
+        el.addEventListener("click", () => fileInput.click());
+      }
+    });
+
+    if (fileInput) {
+      fileInput.addEventListener("change", (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          parseAndLoadSingleInvoiceFile(event.target.result, file.name);
+          fileInput.value = "";
+        };
+        reader.readAsText(file);
+      });
+    }
+
+    // Save Audit button
+    const saveBtn = document.getElementById("btn-save-audit");
+    if (saveBtn) {
+      saveBtn.addEventListener("click", saveCurrentAuditToHistory);
+    }
+  }
+
+  function createNewBlankInvoice() {
+    AppState.activeInvoice = {
+      invoiceNumber: "INV/" + new Date().getFullYear() + "/001",
+      invoiceDate: new Date().toISOString().slice(0, 10),
+      invoiceType: "B2B",
+      supplierName: "",
+      supplierGstin: "",
+      supplierStateCode: "27",
+      recipientName: "",
+      recipientGstin: "",
+      placeOfSupply: "27 - Maharashtra",
+      isRcm: false,
+      irn: "",
+      taxableAmount: 0,
+      cgst: 0,
+      sgst: 0,
+      igst: 0,
+      roundOff: 0,
+      totalAmount: 0,
+      items: [
+        { description: "", hsn: "", qty: 1, rate: 0, discount: 0, taxRate: 18 }
+      ]
+    };
+    populateFormWithInvoice(AppState.activeInvoice);
+    runLiveAudit();
+    switchToTab("inspector");
+    showToast("Opened fresh blank invoice. Enter your details to audit.", "info");
+  }
+
+  function parseAndLoadSingleInvoiceFile(content, fileName) {
+    try {
+      let parsed = null;
+      if (fileName.endsWith(".json")) {
+        const json = JSON.parse(content);
+        // If wrapped in e-invoice schema or custom format
+        if (json.DocDtls || json.SellerDtls) {
+          parsed = {
+            invoiceNumber: (json.DocDtls && json.DocDtls.No) || "INV-IMPORTED",
+            invoiceDate: (json.DocDtls && json.DocDtls.Dt) || new Date().toISOString().slice(0, 10),
+            invoiceType: (json.DocDtls && json.DocDtls.Typ) || "B2B",
+            supplierName: (json.SellerDtls && json.SellerDtls.LglNm) || "",
+            supplierGstin: (json.SellerDtls && json.SellerDtls.Gstin) || "",
+            recipientName: (json.BuyerDtls && json.BuyerDtls.LglNm) || "",
+            recipientGstin: (json.BuyerDtls && json.BuyerDtls.Gstin) || "",
+            placeOfSupply: (json.BuyerDtls && json.BuyerDtls.Pos) || "27",
+            taxableAmount: (json.ValDtls && json.ValDtls.AssVal) || 0,
+            cgst: (json.ValDtls && json.ValDtls.CgstVal) || 0,
+            sgst: (json.ValDtls && json.ValDtls.SgstVal) || 0,
+            igst: (json.ValDtls && json.ValDtls.IgstVal) || 0,
+            totalAmount: (json.ValDtls && json.ValDtls.TotInvVal) || 0,
+            items: Array.isArray(json.ItemList) ? json.ItemList.map(it => ({
+              description: it.PrdDesc || it.ItemDesc || "Imported Item",
+              hsn: it.HsnCd || "998314",
+              qty: it.Qty || 1,
+              rate: it.UnitPrice || 0,
+              discount: it.Discount || 0,
+              taxRate: it.GstRt || 18
+            })) : []
+          };
+        } else {
+          parsed = json;
+        }
+      } else {
+        // Assume CSV
+        const lines = content.trim().split(/\r?\n/);
+        if (lines.length >= 2) {
+          const delimiter = lines[0].includes("\t") ? "\t" : ",";
+          const h = lines[0].split(delimiter).map(s => s.trim().toLowerCase().replace(/[^a-z0-9]/g, ""));
+          const c = lines[1].split(delimiter).map(s => s.trim().replace(/^"(.*)"$/, "$1"));
+          parsed = {
+            invoiceNumber: c[h.findIndex(x => x.includes("no") || x.includes("inv"))] || "INV-001",
+            invoiceDate: c[h.findIndex(x => x.includes("date"))] || new Date().toISOString().slice(0, 10),
+            supplierName: c[h.findIndex(x => x.includes("supp") && x.includes("name"))] || "",
+            supplierGstin: c[h.findIndex(x => x.includes("supp") && x.includes("gst"))] || "",
+            recipientName: c[h.findIndex(x => x.includes("rec") && x.includes("name"))] || "",
+            recipientGstin: c[h.findIndex(x => x.includes("rec") && x.includes("gst"))] || "",
+            placeOfSupply: c[h.findIndex(x => x.includes("pos") || x.includes("place"))] || "27",
+            taxableAmount: parseFloat(c[h.findIndex(x => x.includes("taxable"))]) || 0,
+            cgst: parseFloat(c[h.findIndex(x => x.includes("cgst"))]) || 0,
+            sgst: parseFloat(c[h.findIndex(x => x.includes("sgst"))]) || 0,
+            igst: parseFloat(c[h.findIndex(x => x.includes("igst"))]) || 0,
+            totalAmount: parseFloat(c[h.findIndex(x => x.includes("total"))]) || 0,
+            items: []
+          };
+        }
+      }
+
+      if (!parsed) throw new Error("Could not parse file format.");
+
+      AppState.activeInvoice = parsed;
+      populateFormWithInvoice(parsed);
+      runLiveAudit();
+      switchToTab("inspector");
+      showToast(`Loaded invoice from ${fileName}`, "success");
+    } catch (err) {
+      showToast("Error parsing file: " + err.message, "error");
+    }
+  }
+
+  // --- DEDICATED SCENARIOS & CASE STUDIES TAB ---
+  function renderScenariosGrid() {
+    const grid = document.getElementById("scenarios-grid");
+    if (!grid) return;
+
+    grid.innerHTML = SamplePresets.SCENARIOS.map(s => {
+      const inv = s.data;
+      const totalTax = (Number(inv.cgst || 0) + Number(inv.sgst || 0) + Number(inv.igst || 0));
+      const badgeClass = s.id === 'preset_1' ? 'badge-pass' : 'badge-fail';
+
+      return `
+        <div class="scenario-card">
+          <div>
+            <div class="scenario-card-header">
+              <div class="scenario-card-title">${s.name}</div>
+              <span class="badge ${badgeClass}">${s.badge}</span>
+            </div>
+            <div class="scenario-statute-tag">
+              ${s.id === 'preset_1' ? 'Section 16 Clean Pass' : (s.id === 'preset_2' ? 'Section 8 IGST Act' : (s.id === 'preset_3' ? 'Trade Discount Rule' : (s.id === 'preset_4' ? 'Modulo 36 Luhn Check' : 'Rule 46(f) Limit')))}
+            </div>
+            <p class="scenario-card-desc" style="margin-top: 10px;">${s.description}</p>
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 10px;">
+            <div class="scenario-stats-pill">
+              <span>Taxable: <strong>₹${Number(inv.taxableAmount || 0).toLocaleString("en-IN")}</strong></span>
+              <span>GST: <strong>₹${totalTax.toLocaleString("en-IN")}</strong></span>
+              <span>Total: <strong>₹${Number(inv.totalAmount || 0).toLocaleString("en-IN")}</strong></span>
+            </div>
+            <button type="button" class="btn btn-primary btn-sm btn-load-scenario" data-id="${s.id}" style="width: 100%;">
+              Load into Workstation & Audit →
+            </button>
+          </div>
+        </div>
+      `;
+    }).join("");
+
+    grid.querySelectorAll(".btn-load-scenario").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const id = btn.getAttribute("data-id");
+        loadScenarioById(id);
+        switchToTab("inspector");
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      });
     });
   }
 
@@ -86,7 +288,146 @@ document.addEventListener("DOMContentLoaded", () => {
     populateFormWithInvoice(AppState.activeInvoice);
     runLiveAudit();
 
-    showToast(`Loaded: ${scenario.badge}`, "info");
+    showToast(`Loaded benchmark case: ${scenario.name}`, "info");
+  }
+
+  // --- SAVED AUDITS HISTORY TAB ---
+  function initHistoryTab() {
+    updateHistoryBadgeCount();
+
+    const clearBtn = document.getElementById("btn-clear-history");
+    if (clearBtn) {
+      clearBtn.addEventListener("click", () => {
+        if (confirm("Are you sure you want to clear all saved audits from browser history?")) {
+          localStorage.removeItem("gst_saved_audits");
+          renderAuditHistory();
+          updateHistoryBadgeCount();
+          showToast("Audit history cleared.", "info");
+        }
+      });
+    }
+
+    const exportCsvBtn = document.getElementById("btn-export-history-csv");
+    if (exportCsvBtn) {
+      exportCsvBtn.addEventListener("click", () => {
+        const history = JSON.parse(localStorage.getItem("gst_saved_audits") || "[]");
+        if (history.length === 0) {
+          showToast("No saved audits to export.", "warning");
+          return;
+        }
+        const mapped = history.map(h => ({
+          invoice: h.invoice,
+          audit: {
+            score: h.score,
+            status: h.status,
+            violations: (h.invoice.violations || []).map(t => ({ severity: "SAVED", title: t })),
+            calculated: { posEval: { type: h.invoice.placeOfSupply || "Standard" } }
+          }
+        }));
+        AuditExport.exportAuditToCSV(mapped);
+      });
+    }
+  }
+
+  function saveCurrentAuditToHistory() {
+    if (!AppState.activeInvoice) return;
+
+    const history = JSON.parse(localStorage.getItem("gst_saved_audits") || "[]");
+    const entry = {
+      id: "AUDIT_" + Date.now(),
+      timestamp: new Date().toISOString(),
+      invoice: JSON.parse(JSON.stringify(AppState.activeInvoice)),
+      score: AppState.activeAudit ? AppState.activeAudit.score : 0,
+      status: AppState.activeAudit ? AppState.activeAudit.status : "UNKNOWN",
+      violationsCount: AppState.activeAudit ? AppState.activeAudit.violations.length : 0
+    };
+
+    history.unshift(entry);
+    if (history.length > 50) history.pop(); // Cap at 50
+
+    localStorage.setItem("gst_saved_audits", JSON.stringify(history));
+    updateHistoryBadgeCount();
+    showToast(`Saved Invoice #${entry.invoice.invoiceNumber || 'Untitled'} to Audit History.`, "success");
+  }
+
+  function updateHistoryBadgeCount() {
+    const history = JSON.parse(localStorage.getItem("gst_saved_audits") || "[]");
+    const count = history.length;
+    const badge = document.getElementById("history-badge-count");
+    const headerCount = document.getElementById("history-header-count");
+    if (badge) badge.textContent = count;
+    if (headerCount) headerCount.textContent = `${count} Invoice${count === 1 ? '' : 's'}`;
+  }
+
+  function renderAuditHistory() {
+    const tbody = document.getElementById("history-data-tbody");
+    if (!tbody) return;
+
+    const history = JSON.parse(localStorage.getItem("gst_saved_audits") || "[]");
+    updateHistoryBadgeCount();
+
+    if (history.length === 0) {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="9" style="text-align: center; padding: 24px; color: var(--text-muted);">
+            No saved audits yet. Audit an invoice in the <strong>Workstation</strong> and click <strong>"💾 Save Audit"</strong>.
+          </td>
+        </tr>
+      `;
+      return;
+    }
+
+    tbody.innerHTML = history.map((h, idx) => {
+      const inv = h.invoice;
+      const dateStr = new Date(h.timestamp).toLocaleDateString("en-IN") + " " + new Date(h.timestamp).toLocaleTimeString("en-IN", { hour: '2-digit', minute: '2-digit' });
+      const badgeClass = h.status === "PASS" ? "badge-pass" : (h.status === "WARNING" ? "badge-warn" : "badge-fail");
+
+      return `
+        <tr>
+          <td><span style="font-size: 0.78rem; color: var(--text-muted);">${dateStr}</span></td>
+          <td><strong>${inv.invoiceNumber || '-'}</strong></td>
+          <td>${inv.supplierName || inv.supplierGstin || '-'}</td>
+          <td>${inv.recipientName || inv.recipientGstin || 'B2C Retail'}</td>
+          <td>${inv.placeOfSupply || '-'}</td>
+          <td>₹${Number(inv.totalAmount || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}</td>
+          <td><strong>${h.score}%</strong></td>
+          <td><span class="badge ${badgeClass}">${h.status}</span></td>
+          <td>
+            <div style="display: flex; gap: 6px;">
+              <button type="button" class="btn btn-secondary btn-sm btn-load-history" data-idx="${idx}" title="Load this invoice into Workstation">
+                Inspect
+              </button>
+              <button type="button" class="btn btn-secondary btn-sm btn-del-history" data-idx="${idx}" title="Delete record" style="color: var(--rose-red);">
+                ✕
+              </button>
+            </div>
+          </td>
+        </tr>
+      `;
+    }).join("");
+
+    tbody.querySelectorAll(".btn-load-history").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const idx = parseInt(btn.getAttribute("data-idx"), 10);
+        const item = history[idx];
+        if (item && item.invoice) {
+          AppState.activeInvoice = JSON.parse(JSON.stringify(item.invoice));
+          populateFormWithInvoice(AppState.activeInvoice);
+          runLiveAudit();
+          switchToTab("inspector");
+          showToast(`Loaded Invoice #${item.invoice.invoiceNumber} from history`, "info");
+        }
+      });
+    });
+
+    tbody.querySelectorAll(".btn-del-history").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const idx = parseInt(btn.getAttribute("data-idx"), 10);
+        history.splice(idx, 1);
+        localStorage.setItem("gst_saved_audits", JSON.stringify(history));
+        renderAuditHistory();
+      });
+    });
   }
 
   // --- POPULATE INSPECTOR FORM ---
@@ -98,7 +439,20 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("supplier-gstin").value = inv.supplierGstin || "";
     document.getElementById("recipient-name").value = inv.recipientName || "";
     document.getElementById("recipient-gstin").value = inv.recipientGstin || "";
-    document.getElementById("place-of-supply").value = inv.placeOfSupply || "27 - Maharashtra";
+    
+    // Select Place of Supply by code prefix
+    const posSelect = document.getElementById("place-of-supply");
+    if (posSelect) {
+      const posTarget = String(inv.placeOfSupply || "27").substring(0, 2);
+      for (let i = 0; i < posSelect.options.length; i++) {
+        if (posSelect.options[i].value.startsWith(posTarget)) {
+          posSelect.selectedIndex = i;
+          break;
+        }
+      }
+    }
+    updateSupplyNatureBadge();
+
     document.getElementById("is-rcm").checked = Boolean(inv.isRcm);
     document.getElementById("inv-irn").value = inv.irn || "";
 
@@ -302,26 +656,25 @@ document.addEventListener("DOMContentLoaded", () => {
     const statusDesc = document.getElementById("audit-status-desc");
 
     scoreNum.textContent = audit.score;
-    statusText.textContent = audit.status === "PASS" ? "COMPLIANT PASS" : (audit.status === "FAILED" ? "STATUTORY VIOLATION" : "WARNINGS DETECTED");
 
     scoreCircle.className = "gauge-circle";
     if (audit.score >= 90) {
-      scoreCircle.style.borderColor = "var(--emerald)";
-      scoreCircle.style.boxShadow = "var(--shadow-emerald)";
-      statusText.style.color = "var(--emerald)";
-      statusDesc.textContent = "Invoice is 100% compliant with GST statutory specifications.";
+      scoreCircle.style.borderColor = "var(--emerald-green)";
+      statusText.style.color = "var(--emerald-green)";
+      statusText.textContent = "All Checks Passed";
+      statusDesc.textContent = "Invoice complies with GST invoicing rules and all calculations match.";
     } else if (audit.score >= 60) {
       scoreCircle.classList.add("warn");
-      scoreCircle.style.borderColor = "var(--amber)";
-      scoreCircle.style.boxShadow = "var(--shadow-amber)";
-      statusText.style.color = "var(--amber)";
-      statusDesc.textContent = "Invoice has non-blocking discrepancies or warnings.";
+      scoreCircle.style.borderColor = "var(--amber-warn)";
+      statusText.style.color = "var(--amber-warn)";
+      statusText.textContent = "Minor Warnings Detected";
+      statusDesc.textContent = "Invoice has non-blocking warnings, but tax split and totals are balanced.";
     } else {
       scoreCircle.classList.add("fail");
-      scoreCircle.style.borderColor = "var(--rose)";
-      scoreCircle.style.boxShadow = "0 0 25px rgba(244, 63, 94, 0.4)";
-      statusText.style.color = "var(--rose)";
-      statusDesc.textContent = "Critical statutory violations detected. ITC claim will fail.";
+      scoreCircle.style.borderColor = "var(--rose-red)";
+      statusText.style.color = "var(--rose-red)";
+      statusText.textContent = "Tax Discrepancies Found";
+      statusDesc.textContent = "Critical discrepancies detected. Input Tax Credit (ITC) will be rejected if filed as-is.";
     }
 
     // Auto-fix button visibility
@@ -344,7 +697,7 @@ document.addEventListener("DOMContentLoaded", () => {
             <span class="violation-title">✓ All 10 Statutory GST Rules Cleared</span>
             <span class="badge badge-pass">PASSED</span>
           </div>
-          <div class="violation-desc">GSTIN Luhn checksum, intra/inter-state tax split, mathematical subtotal, and roundoff are verified.</div>
+          <div class="violation-desc">GSTIN check digits, Place of Supply tax split, HSN codes, line item math, and round-off are verified.</div>
         </div>
       `;
     } else {
@@ -357,14 +710,85 @@ document.addEventListener("DOMContentLoaded", () => {
             <span class="badge ${v.severity === 'CRITICAL' ? 'badge-fail' : 'badge-warn'}">${v.severity}</span>
           </div>
           <div class="violation-desc">${v.desc}</div>
-          ${v.fixHint ? `<div class="violation-fix">💡 Suggested Fix: ${v.fixHint}</div>` : ''}
+          ${v.fixHint ? `<div class="violation-fix">💡 Suggested Action: ${v.fixHint}</div>` : ''}
         `;
         violationsContainer.appendChild(card);
       });
     }
 
+    // Synchronize Top KPI Cards for Single Invoice
+    const totalGst = (Number(AppState.activeInvoice.cgst || 0) + Number(AppState.activeInvoice.sgst || 0) + Number(AppState.activeInvoice.igst || 0));
+    const critErrors = audit.violations.filter(v => v.severity === 'CRITICAL').length;
+
+    const kpiRate = document.getElementById("kpi-compliance-rate");
+    const kpiInvoices = document.getElementById("kpi-total-invoices");
+    const kpiTaxable = document.getElementById("kpi-taxable-val");
+    const kpiGst = document.getElementById("kpi-assessed-gst");
+    const kpiErrors = document.getElementById("kpi-critical-errors");
+
+    if (kpiRate) kpiRate.textContent = `${audit.score}%`;
+    if (kpiInvoices) kpiInvoices.textContent = "1 Active";
+    if (kpiTaxable) kpiTaxable.textContent = `₹${Number(AppState.activeInvoice.taxableAmount || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    if (kpiGst) kpiGst.textContent = `₹${totalGst.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    if (kpiErrors) {
+      kpiErrors.textContent = `${critErrors} Error${critErrors === 1 ? '' : 's'}`;
+      kpiErrors.style.color = critErrors > 0 ? "var(--rose-red)" : "var(--emerald-green)";
+    }
+
     // Update Form Badges (GSTIN checks)
     updateGSTINBadges();
+
+    // Update Section 16(2) ITC Checklist
+    updateITCChecklist(audit);
+  }
+
+  function updateITCChecklist(audit) {
+    const sGstin = document.getElementById("supplier-gstin").value.trim();
+    const rGstin = document.getElementById("recipient-gstin").value.trim();
+    const sCheck = GSTRules.verifyGSTINChecksum(sGstin);
+    const hasCritical = audit.violations.some(v => v.severity === "CRITICAL");
+
+    const itcBadge = document.getElementById("itc-eligibility-badge");
+    if (itcBadge) {
+      if (!hasCritical && sCheck.isValid) {
+        itcBadge.className = "badge badge-pass";
+        itcBadge.textContent = "Eligible for ITC";
+      } else {
+        itcBadge.className = "badge badge-fail";
+        itcBadge.textContent = "ITC Ineligible (Resolve Discrepancies)";
+      }
+    }
+
+    const chkGstin = document.getElementById("itc-chk-gstin");
+    if (chkGstin) {
+      chkGstin.innerHTML = sCheck.isValid
+        ? `<span>✅</span> Tax invoice specifies valid 15-digit GSTIN (${sCheck.stateCode})`
+        : `<span>❌</span> Supplier GSTIN check digit invalid`;
+    }
+
+    const chkSplit = document.getElementById("itc-chk-taxsplit");
+    if (chkSplit) {
+      const hasSplitError = audit.violations.some(v => v.ruleId && v.ruleId.includes("POS"));
+      chkSplit.innerHTML = !hasSplitError
+        ? `<span>✅</span> Place of Supply (POS) matches tax split`
+        : `<span>❌</span> Tax split mismatch (CGST/SGST vs IGST)`;
+    }
+
+    const chkMath = document.getElementById("itc-chk-math");
+    if (chkMath) {
+      const hasMathError = audit.violations.some(v => v.ruleId && (v.ruleId.includes("MATH") || v.ruleId.includes("TAXABLE") || v.ruleId.includes("TAX_AMOUNT")));
+      chkMath.innerHTML = !hasMathError
+        ? `<span>✅</span> Line item rates & subtotal verified`
+        : `<span>❌</span> Subtotal calculation discrepancy`;
+    }
+
+    const chkRule46 = document.getElementById("itc-chk-rule46");
+    if (chkRule46) {
+      const hasInvNumError = audit.violations.some(v => v.ruleId && (v.ruleId.includes("INVOICE_NUM") || v.ruleId.includes("FUTURE_DATE")));
+      chkRule46.innerHTML = !hasInvNumError
+        ? `<span>✅</span> Invoice number complies with Rule 46`
+        : `<span>❌</span> Rule 46 non-compliant invoice number/date`;
+    }
   }
 
   function updateGSTINBadges() {
@@ -376,8 +800,8 @@ document.addEventListener("DOMContentLoaded", () => {
       } else {
         const check = GSTRules.verifyGSTINChecksum(sGstin);
         sBadge.innerHTML = check.isValid
-          ? `<span class="badge badge-pass">✓ Checksum OK (${check.stateCode})</span>`
-          : `<span class="badge badge-fail">✕ Checksum Fail</span>`;
+          ? `<span class="badge badge-pass">✓ Valid (${check.stateCode})</span>`
+          : `<span class="badge badge-fail">✕ Invalid Check Digit</span>`;
       }
     }
 
@@ -389,8 +813,8 @@ document.addEventListener("DOMContentLoaded", () => {
       } else {
         const check = GSTRules.verifyGSTINChecksum(rGstin);
         rBadge.innerHTML = check.isValid
-          ? `<span class="badge badge-pass">✓ Checksum OK (${check.stateCode})</span>`
-          : `<span class="badge badge-fail">✕ Checksum Fail</span>`;
+          ? `<span class="badge badge-pass">✓ Valid (${check.stateCode})</span>`
+          : `<span class="badge badge-fail">✕ Invalid Check Digit</span>`;
       }
     }
   }
@@ -569,11 +993,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const avgScore = Math.round(sumScore / total);
 
-    document.getElementById("kpi-total-invoices").textContent = total;
-    document.getElementById("kpi-taxable-val").textContent = `₹${(totalTaxable / 100000).toFixed(2)} L`;
-    document.getElementById("kpi-assessed-gst").textContent = `₹${(totalGst / 100000).toFixed(2)} L`;
+    document.getElementById("kpi-total-invoices").textContent = `${total} Invoices`;
+    document.getElementById("kpi-taxable-val").textContent = `₹${totalTaxable.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    document.getElementById("kpi-assessed-gst").textContent = `₹${totalGst.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     document.getElementById("kpi-compliance-rate").textContent = `${avgScore}%`;
-    document.getElementById("kpi-critical-errors").textContent = criticalCount;
+    document.getElementById("kpi-critical-errors").textContent = `${criticalCount} Error${criticalCount === 1 ? '' : 's'}`;
   }
 
   function renderBulkTable() {

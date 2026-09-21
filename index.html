@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="dark">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Automated GST & Invoice Validator | Zero-Knowledge FinTech Engine</title>
-  <meta name="description" content="Autonomous client-side Indian GST invoice compliance auditor. Validates Modulo 36 Luhn GSTIN checksum, Place of Supply, statutory tax slabs, and arithmetic precision.">
+  <title>GST Invoice Verification & Compliance Tool | Priyanshu Pandey</title>
+  <meta name="description" content="A practical client-side tool to verify Indian GST invoices, GSTIN check digits, CGST/SGST/IGST tax splits, line item math, and statutory rules.">
 
   <!-- Favicon -->
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
@@ -22,7 +22,7 @@
 <body>
 
   <div class="app-container">
-    <!-- Top Executive Header -->
+    <!-- Top Header -->
     <header class="app-header">
       <div class="brand-section">
         <div class="brand-icon">
@@ -33,196 +33,209 @@
         </div>
         <div>
           <div class="brand-title">
-            GSTAlign <span class="brand-badge">Client-Side FinTech</span>
+            GST Invoice Auditor <span class="brand-badge">Rules 16 & 46 Check</span>
           </div>
-          <div class="brand-subtitle">Automated GST & Invoice Compliance Engine · 10 Statutory Rules</div>
+          <div class="brand-subtitle">Verify GSTIN checksums, Place of Supply tax split, HSN codes, and invoice calculations</div>
         </div>
       </div>
 
       <div class="header-actions">
-        <!-- Live E-Invoice QR & API Gateway Buttons -->
-        <button id="btn-scan-qr" class="btn btn-secondary btn-sm" title="Decode NIC Signed E-Invoice QR Code">
-          📷 E-Invoice QR
+        <!-- Main Workstation Action Buttons -->
+        <button id="btn-header-new" class="btn btn-primary btn-sm" title="Start a new blank invoice audit">
+          + New Invoice
         </button>
-        <button id="btn-api-settings" class="btn btn-secondary btn-sm" title="Live GSTN Verification API Gateway">
-          🌐 API Gateway
+        <button id="btn-header-upload" class="btn btn-secondary btn-sm" title="Upload and parse your invoice JSON or CSV">
+          📁 Upload Invoice
         </button>
-
-        <!-- Scenario Presets -->
-        <div class="preset-selector">
-          <label for="preset-select" style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted);">Scenario:</label>
-          <select id="preset-select" class="preset-select"></select>
-        </div>
-
-        <!-- Theme Toggle -->
-        <button id="theme-toggle-btn" class="theme-toggle-btn" title="Toggle Dark/Light Mode">☀️</button>
+        <button id="btn-scan-qr" class="btn btn-secondary btn-sm" title="Upload or scan official NIC E-Invoice QR code">
+          📷 Scan QR
+        </button>
+        <button id="btn-api-settings" class="btn btn-secondary btn-sm" title="Configure live GSTN taxpayer search">
+          🔍 GSTIN Portal
+        </button>
+        <!-- Hidden file input for uploading invoice files -->
+        <input type="file" id="single-invoice-file-input" accept=".json,.csv,.txt" style="display: none;">
       </div>
     </header>
 
-    <!-- Executive Health Cockpit KPI Ribbon -->
+    <!-- Top Summary KPI Cards -->
     <section class="kpi-grid">
       <div class="kpi-card emerald">
-        <div class="form-label">Compliance Rate <span class="badge badge-pass">HEALTH</span></div>
-        <div id="kpi-compliance-rate" style="font-size: 1.8rem; font-weight: 800; color: var(--text-main);">100%</div>
-        <div class="form-hint">Weighted audit scoring</div>
+        <div class="form-label" style="margin-bottom: 2px;">Audit Status <span class="badge badge-pass">Pass</span></div>
+        <div id="kpi-compliance-rate" style="font-size: 1.65rem; font-weight: 800; color: var(--text-main); margin: 4px 0;">100% Pass</div>
+        <div class="form-hint">All 10 GST rules matched</div>
       </div>
 
       <div class="kpi-card cyan">
-        <div class="form-label">Audited Invoices <span class="badge badge-info">BATCH</span></div>
-        <div id="kpi-total-invoices" style="font-size: 1.8rem; font-weight: 800; color: var(--text-main);">1</div>
-        <div class="form-hint">Processed in memory</div>
+        <div class="form-label" style="margin-bottom: 2px;">Invoices Checked <span class="badge badge-info">Count</span></div>
+        <div id="kpi-total-invoices" style="font-size: 1.65rem; font-weight: 800; color: var(--text-main); margin: 4px 0;">1 Active</div>
+        <div class="form-hint">Currently reviewing</div>
       </div>
 
       <div class="kpi-card cyan">
-        <div class="form-label">Taxable Value <span class="badge badge-info">BASE</span></div>
-        <div id="kpi-taxable-val" style="font-size: 1.8rem; font-weight: 800; color: var(--text-main);">₹1.50 L</div>
-        <div class="form-hint">Aggregated subtotal</div>
+        <div class="form-label" style="margin-bottom: 2px;">Taxable Amount <span class="badge badge-info">Subtotal</span></div>
+        <div id="kpi-taxable-val" style="font-size: 1.65rem; font-weight: 800; color: var(--text-main); margin: 4px 0;">₹1,50,000</div>
+        <div class="form-hint">Amount before tax</div>
       </div>
 
       <div class="kpi-card amber">
-        <div class="form-label">Assessed GST <span class="badge badge-warn">TAX</span></div>
-        <div id="kpi-assessed-gst" style="font-size: 1.8rem; font-weight: 800; color: var(--text-main);">₹0.27 L</div>
+        <div class="form-label" style="margin-bottom: 2px;">GST Assessed <span class="badge badge-warn">Taxes</span></div>
+        <div id="kpi-assessed-gst" style="font-size: 1.65rem; font-weight: 800; color: var(--text-main); margin: 4px 0;">₹27,000</div>
         <div class="form-hint">CGST + SGST + IGST</div>
       </div>
 
       <div class="kpi-card rose">
-        <div class="form-label">Critical Violations <span class="badge badge-fail">ALERT</span></div>
-        <div id="kpi-critical-errors" style="font-size: 1.8rem; font-weight: 800; color: var(--rose);">0</div>
-        <div class="form-hint">ITC claim blocking errors</div>
+        <div class="form-label" style="margin-bottom: 2px;">Errors Detected <span class="badge badge-fail">Attention</span></div>
+        <div id="kpi-critical-errors" style="font-size: 1.65rem; font-weight: 800; color: var(--rose-red); margin: 4px 0;">0 Errors</div>
+        <div class="form-hint">Resolve to claim ITC</div>
       </div>
     </section>
 
-    <!-- Navigation Tabs -->
+    <!-- Navigation Tabs (Clean separation between Workstation, Bulk, Test Suite & History) -->
     <nav class="tabs-nav">
       <button class="tab-btn active" data-tab="inspector">
-        <span>⚡</span> Live Invoice Inspector
+        <span>📄</span> Invoice Auditor Workstation
       </button>
       <button class="tab-btn" data-tab="bulk">
-        <span>📂</span> Bulk Register & CSV Auditor
+        <span>📊</span> Bulk CSV / Sales Register
+      </button>
+      <button class="tab-btn" data-tab="scenarios">
+        <span>🧪</span> Test Scenarios & Case Studies <span class="badge badge-info" style="font-size: 0.72rem; padding: 2px 7px;">5 Cases</span>
+      </button>
+      <button class="tab-btn" data-tab="history">
+        <span>📁</span> Audit History <span id="history-badge-count" class="badge badge-pass" style="font-size: 0.72rem; padding: 2px 7px;">0</span>
       </button>
     </nav>
 
-    <!-- TAB 1: LIVE INVOICE INSPECTOR -->
+    <!-- TAB 1: SINGLE INVOICE INSPECTOR WORKSTATION -->
     <main id="tab-inspector" class="tab-content active">
       <div class="inspector-layout">
         
-        <!-- Left: Interactive Form & Line Items -->
+        <!-- Left Panel: Invoice Details -->
         <section class="panel">
           <div class="panel-header">
             <h2 class="panel-title">
-              <span>Tax Invoice Particulars</span>
-              <span id="supply-nature-badge" class="badge badge-info">INTRA-STATE</span>
+              <span>Invoice Information & Tax Breakdown</span>
+              <span id="supply-nature-badge" class="badge badge-info">INTRA-STATE (CGST + SGST)</span>
             </h2>
-            <div style="display: flex; gap: 8px;">
+            <div class="panel-toolbar">
+              <button type="button" id="btn-new-invoice" class="btn btn-secondary btn-sm" title="Reset form to enter a new invoice">
+                + New / Clear
+              </button>
+              <button type="button" id="btn-upload-file" class="btn btn-secondary btn-sm" title="Upload invoice file (JSON / CSV)">
+                📂 Upload File
+              </button>
+              <button type="button" id="btn-save-audit" class="btn btn-secondary btn-sm" title="Save this audit record into local history">
+                💾 Save Audit
+              </button>
               <button type="button" id="btn-autofix" class="btn-autofix" style="display: none;">
-                ⚡ 1-Click Auto-Fix
+                ⚡ Fix Taxes Automatically
               </button>
               <button type="button" id="btn-print-slip" class="btn btn-secondary btn-sm">
-                🖨️ Audit Slip
+                🖨️ Print Audit Summary
               </button>
             </div>
           </div>
 
           <form id="inspector-form" onsubmit="return false;">
-            <!-- Row 1: Invoice Meta -->
+            <!-- Row 1: Invoice Meta (3 equal columns) -->
             <div class="form-grid-3">
               <div class="form-group">
-                <label class="form-label" for="inv-number">Invoice Number <span class="form-hint">Max 16 chars</span></label>
-                <input type="text" id="inv-number" class="form-control" placeholder="INV/2026/01">
+                <label class="form-label" for="inv-number">Invoice Number</label>
+                <input type="text" id="inv-number" class="form-control" placeholder="e.g. INV/2026/0842">
+                <div class="form-field-footer">
+                  <span class="form-hint">Up to 16 characters (Rule 46)</span>
+                </div>
               </div>
               <div class="form-group">
                 <label class="form-label" for="inv-date">Invoice Date</label>
                 <input type="date" id="inv-date" class="form-control">
+                <div class="form-field-footer">
+                  <span class="form-hint">Bill issue date</span>
+                </div>
               </div>
               <div class="form-group">
-                <label class="form-label" for="inv-type">Transaction Type</label>
+                <label class="form-label" for="inv-type">Supply Category</label>
                 <select id="inv-type" class="form-control">
-                  <option value="B2B">B2B (Registered Recipient)</option>
-                  <option value="B2C">B2C (Consumer Retail)</option>
+                  <option value="B2B">B2B (Registered Business)</option>
+                  <option value="B2C">B2C (Retail Consumer)</option>
                   <option value="EXPORT">Export / SEZ Supply</option>
                 </select>
+                <div class="form-field-footer">
+                  <span class="form-hint">Tax classification</span>
+                </div>
               </div>
             </div>
 
-            <!-- Row 2: Supplier Entity -->
+            <!-- Row 2: Seller Particulars (2 equal columns) -->
             <div class="form-grid-2">
               <div class="form-group">
-                <label class="form-label" for="supplier-name">Supplier Registered Name</label>
-                <input type="text" id="supplier-name" class="form-control" placeholder="Company Legal Name">
+                <label class="form-label" for="supplier-name">Seller / Company Name</label>
+                <input type="text" id="supplier-name" class="form-control" placeholder="e.g. CloudScale Infotech Pvt Ltd">
+                <div class="form-field-footer">
+                  <span class="form-hint">Registered legal firm name</span>
+                </div>
               </div>
               <div class="form-group">
-                <label class="form-label" for="supplier-gstin">
-                  <span>Supplier GSTIN (15 Digits)</span>
-                  <span style="display: flex; align-items: center; gap: 6px;">
-                    <span id="supplier-gstin-badge"></span>
-                    <button type="button" id="btn-lookup-supplier" class="btn btn-secondary btn-sm" style="padding: 1px 7px; font-size: 0.7rem;">🔍 Live Lookup</button>
-                    <a id="link-official-supplier" href="https://services.gst.gov.in/services/searchtp" target="_blank" rel="noopener noreferrer" style="font-size: 0.7rem; color: var(--cyan); text-decoration: none;" title="Verify on official GST portal">Portal ↗</a>
+                <label class="form-label" for="supplier-gstin">Seller GSTIN (15 Digits)</label>
+                <input type="text" id="supplier-gstin" class="form-control form-control-mono" maxlength="15" placeholder="e.g. 27AABCU9603R1ZN">
+                <div class="form-field-footer">
+                  <span id="supplier-gstin-badge"></span>
+                  <span>
+                    <button type="button" id="btn-lookup-supplier" class="btn-link">Verify GSTN</button> · 
+                    <a id="link-official-supplier" href="https://services.gst.gov.in/services/searchtp" target="_blank" rel="noopener noreferrer" class="btn-link">Portal ↗</a>
                   </span>
-                </label>
-                <input type="text" id="supplier-gstin" class="form-control form-control-mono" maxlength="15" placeholder="27AABCU9603R1ZN">
+                </div>
               </div>
             </div>
 
-            <!-- Row 3: Recipient & Place of Supply -->
+            <!-- Row 3: Buyer & Delivery State (3 equal columns) -->
             <div class="form-grid-3">
               <div class="form-group">
-                <label class="form-label" for="recipient-name">Recipient Name</label>
-                <input type="text" id="recipient-name" class="form-control" placeholder="Buyer Name">
+                <label class="form-label" for="recipient-name">Buyer / Customer Name</label>
+                <input type="text" id="recipient-name" class="form-control" placeholder="e.g. Nexus Digital Solutions LLP">
+                <div class="form-field-footer">
+                  <span class="form-hint">Recipient entity name</span>
+                </div>
               </div>
               <div class="form-group">
-                <label class="form-label" for="recipient-gstin">
-                  <span>Recipient GSTIN</span>
-                  <span style="display: flex; align-items: center; gap: 6px;">
-                    <span id="recipient-gstin-badge"></span>
-                    <button type="button" id="btn-lookup-recipient" class="btn btn-secondary btn-sm" style="padding: 1px 7px; font-size: 0.7rem;">🔍 Live Lookup</button>
-                    <a id="link-official-recipient" href="https://services.gst.gov.in/services/searchtp" target="_blank" rel="noopener noreferrer" style="font-size: 0.7rem; color: var(--cyan); text-decoration: none;" title="Verify on official GST portal">Portal ↗</a>
+                <label class="form-label" for="recipient-gstin">Buyer GSTIN</label>
+                <input type="text" id="recipient-gstin" class="form-control form-control-mono" maxlength="15" placeholder="Buyer GSTIN (or blank for retail)">
+                <div class="form-field-footer">
+                  <span id="recipient-gstin-badge"></span>
+                  <span>
+                    <button type="button" id="btn-lookup-recipient" class="btn-link">Verify GSTN</button> · 
+                    <a id="link-official-recipient" href="https://services.gst.gov.in/services/searchtp" target="_blank" rel="noopener noreferrer" class="btn-link">Portal ↗</a>
                   </span>
-                </label>
-                <input type="text" id="recipient-gstin" class="form-control form-control-mono" maxlength="15" placeholder="Buyer GSTIN (or blank)">
+                </div>
               </div>
               <div class="form-group">
-                <label class="form-label" for="place-of-supply">Place of Supply (POS)</label>
-                <select id="place-of-supply" class="form-control">
-                  <option value="01 - Jammu and Kashmir">01 - Jammu and Kashmir</option>
-                  <option value="02 - Himachal Pradesh">02 - Himachal Pradesh</option>
-                  <option value="03 - Punjab">03 - Punjab</option>
-                  <option value="06 - Haryana">06 - Haryana</option>
-                  <option value="07 - Delhi">07 - Delhi</option>
-                  <option value="08 - Rajasthan">08 - Rajasthan</option>
-                  <option value="09 - Uttar Pradesh">09 - Uttar Pradesh</option>
-                  <option value="10 - Bihar">10 - Bihar</option>
-                  <option value="19 - West Bengal">19 - West Bengal</option>
-                  <option value="23 - Madhya Pradesh">23 - Madhya Pradesh</option>
-                  <option value="24 - Gujarat">24 - Gujarat</option>
-                  <option value="27 - Maharashtra" selected>27 - Maharashtra</option>
-                  <option value="29 - Karnataka">29 - Karnataka</option>
-                  <option value="30 - Goa">30 - Goa</option>
-                  <option value="32 - Kerala">32 - Kerala</option>
-                  <option value="33 - Tamil Nadu">33 - Tamil Nadu</option>
-                  <option value="36 - Telangana">36 - Telangana</option>
-                  <option value="37 - Andhra Pradesh">37 - Andhra Pradesh</option>
-                </select>
+                <label class="form-label" for="place-of-supply">Place of Supply (State)</label>
+                <select id="place-of-supply" class="form-control"></select>
+                <div class="form-field-footer">
+                  <span class="form-hint">Determines CGST+SGST vs IGST</span>
+                </div>
               </div>
             </div>
 
-            <!-- Dynamic Line Items Section -->
+            <!-- Line Items Table -->
             <div class="line-items-container">
-              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                <label class="form-label" style="font-weight: 700; margin: 0;">Line Items & Tax Slabs</label>
-                <button type="button" id="btn-add-item" class="btn btn-secondary btn-sm">+ Add Line Item</button>
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                <label class="form-label" style="font-weight: 700; margin: 0;">Line Items & GST Rates</label>
+                <button type="button" id="btn-add-item" class="btn btn-secondary btn-sm">+ Add Item Row</button>
               </div>
 
               <div style="overflow-x: auto;">
                 <table class="line-items-table">
                   <thead>
                     <tr>
-                      <th style="min-width: 140px;">Description</th>
-                      <th>HSN/SAC</th>
-                      <th>Qty</th>
-                      <th>Rate (₹)</th>
-                      <th>Disc (₹)</th>
-                      <th>GST Slab</th>
-                      <th></th>
+                      <th style="min-width: 180px;">Item Description</th>
+                      <th style="width: 100px;">HSN / SAC</th>
+                      <th style="width: 65px;">Qty</th>
+                      <th style="width: 105px;">Rate (₹)</th>
+                      <th style="width: 95px;">Discount (₹)</th>
+                      <th style="width: 95px;">GST Slab</th>
+                      <th style="width: 35px;"></th>
                     </tr>
                   </thead>
                   <tbody id="line-items-tbody"></tbody>
@@ -230,11 +243,11 @@
               </div>
             </div>
 
-            <!-- Tax Summary Inputs -->
+            <!-- Financial Totals -->
             <div class="invoice-summary-box">
               <div class="form-grid-4">
                 <div class="form-group" style="margin-bottom: 0;">
-                  <label class="form-label" for="inv-taxable">Taxable Base (₹)</label>
+                  <label class="form-label" for="inv-taxable">Taxable Subtotal (₹)</label>
                   <input type="number" id="inv-taxable" step="0.01" class="form-control">
                 </div>
                 <div class="form-group" style="margin-bottom: 0;">
@@ -251,57 +264,79 @@
                 </div>
               </div>
 
-              <div class="form-grid-3" style="margin-top: 12px;">
+              <div class="form-grid-3" style="margin-top: 10px;">
                 <div class="form-group" style="margin-bottom: 0;">
-                  <label class="form-label" for="inv-roundoff">Round-Off (±₹1.00)</label>
-                  <input type="number" id="inv-roundoff" step="0.01" class="form-control">
+                  <label class="form-label" for="inv-roundoff">Round-Off (₹)</label>
+                  <input type="number" id="inv-roundoff" step="0.01" class="form-control" placeholder="±1.00 allowed">
                 </div>
                 <div class="form-group" style="margin-bottom: 0;">
-                  <label class="form-label" for="inv-total" style="color: var(--emerald); font-weight: 700;">Grand Total (₹)</label>
-                  <input type="number" id="inv-total" step="0.01" class="form-control" style="font-weight: 700; color: var(--emerald);">
+                  <label class="form-label" for="inv-total" style="color: var(--primary-navy); font-weight: 800;">Final Invoice Total (₹)</label>
+                  <input type="number" id="inv-total" step="0.01" class="form-control" style="font-weight: 800; color: var(--primary-navy); font-size: 1.1rem;">
                 </div>
                 <div class="form-group" style="margin-bottom: 0;">
-                  <label class="form-label" for="inv-irn">E-Invoice IRN Hash (64-char)</label>
-                  <input type="text" id="inv-irn" class="form-control form-control-mono" placeholder="Optional 64-hex IRN">
+                  <label class="form-label" for="inv-irn">E-Invoice IRN (Optional)</label>
+                  <input type="text" id="inv-irn" class="form-control form-control-mono" placeholder="64-character hash">
                 </div>
               </div>
 
               <div style="margin-top: 10px; display: flex; align-items: center; gap: 8px;">
                 <input type="checkbox" id="is-rcm">
-                <label for="is-rcm" style="font-size: 0.82rem; color: var(--text-muted); cursor: pointer;">
-                  Reverse Charge Mechanism (RCM) applicable (Tax payable by Recipient)
+                <label for="is-rcm" style="font-size: 0.85rem; color: var(--text-body); cursor: pointer;">
+                  Tax is payable under Reverse Charge Mechanism (RCM)
                 </label>
               </div>
             </div>
           </form>
         </section>
 
-        <!-- Right: Compliance Diagnosis & Violation Ledger -->
+        <!-- Right Panel: Verification Findings -->
         <aside class="panel">
           <div class="panel-header">
-            <h2 class="panel-title">Statutory Audit Diagnosis</h2>
+            <h2 class="panel-title">Verification & Audit Report</h2>
           </div>
 
-          <!-- Gauge Box -->
+          <!-- Gauge Score Box -->
           <div class="compliance-score-box">
             <div id="audit-gauge-circle" class="gauge-circle">
               <span id="audit-score-num">100</span>
               <small>Score</small>
             </div>
             <div class="score-details">
-              <h4 id="audit-status-text">COMPLIANT PASS</h4>
-              <p id="audit-status-desc">Invoice is 100% compliant with GST statutory specifications.</p>
+              <h4 id="audit-status-text">All Checks Passed</h4>
+              <p id="audit-status-desc">This invoice complies with Indian GST rules and calculations match.</p>
             </div>
           </div>
 
-          <!-- Real-Time Violations / Passes List -->
+          <!-- Findings List -->
           <div id="violations-container" class="violations-list"></div>
+
+          <!-- Section 16(2) CGST Act ITC Checklist -->
+          <div class="itc-box">
+            <div class="itc-title">
+              <span>Section 16(2) ITC Checklist</span>
+              <span id="itc-eligibility-badge" class="badge badge-pass">Eligible</span>
+            </div>
+            <ul class="itc-checklist">
+              <li class="itc-check-item" id="itc-chk-gstin">
+                <span>✅</span> Tax invoice specifies valid 15-digit GSTINs
+              </li>
+              <li class="itc-check-item" id="itc-chk-taxsplit">
+                <span>✅</span> Place of Supply (POS) matches tax split (CGST+SGST vs IGST)
+              </li>
+              <li class="itc-check-item" id="itc-chk-math">
+                <span>✅</span> Line item rates & subtotal calculation verified
+              </li>
+              <li class="itc-check-item" id="itc-chk-rule46">
+                <span>✅</span> Invoice number complies with Rule 46 16-character limit
+              </li>
+            </ul>
+          </div>
         </aside>
 
       </div>
     </main>
 
-    <!-- TAB 2: BULK REGISTER AUDIT & CSV INGESTION -->
+    <!-- TAB 2: BULK REGISTER AUDIT -->
     <main id="tab-bulk" class="tab-content">
       <div class="bulk-layout">
         
@@ -313,35 +348,35 @@
               <polyline points="17 8 12 3 7 8"/>
               <line x1="12" y1="3" x2="12" y2="15"/>
             </svg>
-            <div class="dropzone-text">Drop CSV or JSON Invoice Registers Here</div>
-            <div class="dropzone-sub">or click to browse local files (Zero-Knowledge, 100% Client-Side)</div>
+            <div class="dropzone-text">Drop CSV or Excel Export Here</div>
+            <div class="dropzone-sub">Runs completely inside your browser · Data never leaves your computer</div>
             <input type="file" id="bulk-file-input" accept=".csv, .tsv, .json" style="display: none;">
           </div>
 
-          <!-- Direct Paste from Excel/Tally -->
-          <div class="panel" style="padding: 16px;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-              <span style="font-size: 0.85rem; font-weight: 700;">Paste Tabular Data from Excel / Tally:</span>
+          <!-- Direct Paste -->
+          <div class="panel" style="padding: 14px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+              <span style="font-size: 0.85rem; font-weight: 700;">Or Paste Data from Excel / Tally:</span>
               <button id="btn-load-sample-bulk" class="btn btn-secondary btn-sm">⚡ Load 10 Sample Invoices</button>
             </div>
-            <textarea id="bulk-paste-area" class="bulk-textarea" placeholder="Paste tab-delimited or comma-separated daybook records here..."></textarea>
+            <textarea id="bulk-paste-area" class="bulk-textarea" placeholder="Paste tab-separated or comma-separated rows here..."></textarea>
             <div style="margin-top: 8px; text-align: right;">
-              <button id="btn-parse-paste" class="btn btn-primary btn-sm">Audit Pasted Records</button>
+              <button id="btn-parse-paste" class="btn btn-primary btn-sm">Verify Pasted Rows</button>
             </div>
           </div>
         </div>
 
-        <!-- Bulk Results Data Grid -->
+        <!-- Bulk Results Table -->
         <div class="data-grid-container">
           <div class="grid-filter-bar">
             <div class="filter-pills">
               <button class="filter-pill-btn active" data-filter="all">All Invoices</button>
-              <button class="filter-pill-btn" data-filter="critical">⛔ Critical Violations</button>
-              <button class="filter-pill-btn" data-filter="warning">⚠️ Warnings</button>
-              <button class="filter-pill-btn" data-filter="pass">✓ Compliant Passes</button>
+              <button class="filter-pill-btn" data-filter="critical">⛔ Errors Only</button>
+              <button class="filter-pill-btn" data-filter="warning">⚠️ Warnings Only</button>
+              <button class="filter-pill-btn" data-filter="pass">✓ Clean Passes Only</button>
             </div>
             <div>
-              <button id="btn-export-csv" class="btn btn-secondary btn-sm">📥 Export Audit Report (CSV)</button>
+              <button id="btn-export-csv" class="btn btn-secondary btn-sm">📥 Export Findings (CSV)</button>
             </div>
           </div>
 
@@ -350,12 +385,12 @@
               <thead>
                 <tr>
                   <th>Invoice No</th>
-                  <th>Supplier GSTIN</th>
+                  <th>Seller GSTIN</th>
                   <th>Buyer GSTIN</th>
                   <th>Supply Type</th>
                   <th>Taxable (₹)</th>
                   <th>Total GST (₹)</th>
-                  <th>Total Amount (₹)</th>
+                  <th>Final Amount (₹)</th>
                   <th>Score</th>
                   <th>Status</th>
                 </tr>
@@ -363,7 +398,7 @@
               <tbody id="bulk-data-tbody">
                 <tr>
                   <td colspan="9" style="text-align: center; padding: 24px; color: var(--text-muted);">
-                    No bulk invoices loaded yet. Click <strong>"⚡ Load 10 Sample Invoices"</strong> or drop a CSV file above.
+                    No invoices imported yet. Click <strong>"⚡ Load 10 Sample Invoices"</strong> or drop a CSV file above.
                   </td>
                 </tr>
               </tbody>
@@ -374,22 +409,87 @@
       </div>
     </main>
 
+    <!-- TAB 3: DEDICATED AUDIT TEST SCENARIOS & CASE STUDIES -->
+    <main id="tab-scenarios" class="tab-content">
+      <div class="scenarios-panel">
+        <div class="scenarios-header">
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+            <div>
+              <h2 style="font-size: 1.25rem; font-weight: 800; color: var(--text-navy);">Statutory Audit Test Cases & Benchmarks</h2>
+              <p style="font-size: 0.875rem; color: var(--text-muted); margin-top: 3px;">
+                Dedicated benchmark suite demonstrating statutory GST rules: Place of Supply conflicts, Modulo 36 Luhn checksum, discount drift, and high-value consumer thresholds.
+              </p>
+            </div>
+            <div>
+              <span class="badge badge-info" style="font-size: 0.8rem; padding: 5px 12px;">5 Benchmark Cases</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="scenarios-grid" id="scenarios-grid"></div>
+      </div>
+    </main>
+
+    <!-- TAB 4: SAVED AUDITS HISTORY -->
+    <main id="tab-history" class="tab-content">
+      <div class="panel">
+        <div class="panel-header">
+          <h2 class="panel-title">
+            <span>Saved Audits History</span>
+            <span id="history-header-count" class="badge badge-info">0 Invoices</span>
+          </h2>
+          <div style="display: flex; gap: 8px;">
+            <button type="button" id="btn-clear-history" class="btn btn-secondary btn-sm" title="Clear all saved audit history from your browser">
+              🗑️ Clear History
+            </button>
+            <button type="button" id="btn-export-history-csv" class="btn btn-secondary btn-sm" title="Export saved audits to CSV">
+              📥 Export CSV
+            </button>
+          </div>
+        </div>
+        <div class="data-table-wrapper">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Saved At</th>
+                <th>Invoice No</th>
+                <th>Seller Name</th>
+                <th>Buyer Name</th>
+                <th>Place of Supply</th>
+                <th>Total Value (₹)</th>
+                <th>Audit Score</th>
+                <th>Status</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="history-data-tbody">
+              <tr>
+                <td colspan="9" style="text-align: center; padding: 24px; color: var(--text-muted);">
+                  No saved audits yet. Audit an invoice in the <strong>Workstation</strong> and click <strong>"💾 Save Audit"</strong>.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+
     <!-- Footer -->
     <footer class="app-footer">
       <div>
-        <strong>Automated GST & Invoice Validator</strong> · Designed & Engineered by <a href="https://github.com/iq4u8" target="_blank">Priyanshu Pandey (IQ4U8)</a>
+        <strong>GST Invoice Verification Tool</strong> · Built by <a href="https://github.com/iq4u8" target="_blank">Priyanshu Pandey (IQ4U8)</a>
       </div>
       <div>
-        Built with Pure Vanilla JS · Zero-Knowledge Privacy · Compliant with Indian GST Statutory Acts
+        100% Client-Side Privacy · Compliant with Indian GST Acts and Rules
       </div>
     </footer>
   </div>
 
-  <!-- Statutory Audit Certificate Modal -->
+  <!-- Printable Summary Modal -->
   <div id="report-modal" class="modal-overlay">
     <div class="modal-box">
       <div class="modal-header">
-        <h3 style="font-size: 1.1rem; font-weight: 700;">Executive Statutory Certificate</h3>
+        <h3 style="font-size: 1.05rem; font-weight: 700; color: var(--text-navy);">Invoice Audit Summary</h3>
         <button id="modal-close-btn" class="btn-icon" style="border: none; cursor: pointer;">✕</button>
       </div>
       <div id="report-modal-body"></div>
@@ -400,7 +500,7 @@
   <div id="taxpayer-modal" class="modal-overlay">
     <div class="modal-box">
       <div class="modal-header">
-        <h3 style="font-size: 1.1rem; font-weight: 700;">🔍 Live GSTN Taxpayer Verification</h3>
+        <h3 style="font-size: 1.05rem; font-weight: 700; color: var(--text-navy);">GSTN Taxpayer Lookup</h3>
         <button id="taxpayer-modal-close" class="btn-icon" style="border: none; cursor: pointer;">✕</button>
       </div>
       <div id="taxpayer-modal-body"></div>
@@ -411,11 +511,11 @@
   <div id="qr-modal" class="modal-overlay">
     <div class="modal-box">
       <div class="modal-header">
-        <h3 style="font-size: 1.1rem; font-weight: 700;">📷 Decode Official NIC E-Invoice QR Code</h3>
+        <h3 style="font-size: 1.05rem; font-weight: 700; color: var(--text-navy);">Scan / Decode E-Invoice QR</h3>
         <button id="qr-modal-close" class="btn-icon" style="border: none; cursor: pointer;">✕</button>
       </div>
-      <div style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 16px;">
-        Upload a scanned B2B invoice QR code image or paste the signed JWT payload under GST Rule 48(4).
+      <div style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 14px;">
+        Upload a scanned B2B invoice QR code image or paste the signed QR payload.
       </div>
       
       <div class="dropzone" id="qr-dropzone" style="padding: 20px; margin-bottom: 14px;">
@@ -425,19 +525,19 @@
           <rect x="14" y="14" width="7" height="7"/>
           <rect x="3" y="14" width="7" height="7"/>
         </svg>
-        <div class="dropzone-text" style="font-size: 0.88rem;">Drop QR Code Image Here</div>
-        <div class="dropzone-sub">or click to browse PNG, JPG</div>
+        <div class="dropzone-text" style="font-size: 0.85rem;">Drop QR Code Image Here</div>
+        <div class="dropzone-sub">or click to choose image (PNG, JPG)</div>
         <input type="file" id="qr-file-input" accept="image/*" style="display: none;">
       </div>
 
       <div class="form-group">
-        <label class="form-label" for="qr-jwt-paste">Or Paste Signed JWT Token / Raw QR Payload:</label>
-        <textarea id="qr-jwt-paste" class="form-control form-control-mono" style="height: 90px; font-size: 0.76rem;" placeholder="eyJhbGciOiJSUzI1NiJ9..."></textarea>
+        <label class="form-label" for="qr-jwt-paste">Or Paste Signed QR Code String:</label>
+        <textarea id="qr-jwt-paste" class="form-control form-control-mono" style="height: 85px; font-size: 0.76rem;" placeholder="Paste QR data or signed JWT token here..."></textarea>
       </div>
 
       <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 14px;">
-        <button type="button" id="btn-load-sample-qr" class="btn btn-secondary btn-sm">⚡ Load Sample E-Invoice QR</button>
-        <button type="button" id="btn-decode-qr" class="btn btn-primary btn-sm">Decode & Ingest into Audit</button>
+        <button type="button" id="btn-load-sample-qr" class="btn btn-secondary btn-sm">⚡ Load Sample QR</button>
+        <button type="button" id="btn-decode-qr" class="btn btn-primary btn-sm">Decode & Check Invoice</button>
       </div>
     </div>
   </div>
@@ -446,39 +546,41 @@
   <div id="api-modal" class="modal-overlay">
     <div class="modal-box">
       <div class="modal-header">
-        <h3 style="font-size: 1.1rem; font-weight: 700;">🌐 GSTN Live API Gateway Settings</h3>
+        <h3 style="font-size: 1.05rem; font-weight: 700; color: var(--text-navy);">Live GSTN Search Settings</h3>
         <button id="api-modal-close" class="btn-icon" style="border: none; cursor: pointer;">✕</button>
       </div>
-      <div style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 16px;">
-        Connect to live Indian GST taxpayer databases. You can use your own GSP/ASP developer token or test using the verified sandbox gateway.
+      <div style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 14px;">
+        Configure your live GST verification provider. By default, the verified sandbox database is used for testing.
       </div>
 
       <div class="form-group">
-        <label class="form-label" for="api-provider-select">API Provider:</label>
+        <label class="form-label" for="api-provider-select">Provider Service:</label>
         <select id="api-provider-select" class="form-control">
-          <option value="sandbox">Sandbox.co.in (GSTIN Taxpayer Public API)</option>
-          <option value="cashfree">Cashfree Verification Suite</option>
+          <option value="sandbox">Sandbox.co.in (GSTIN Taxpayer Search)</option>
+          <option value="cashfree">Cashfree Verification API</option>
           <option value="mastersindia">MastersIndia GSP Gateway</option>
-          <option value="custom">Custom REST Endpoint</option>
+          <option value="custom">Custom API Endpoint</option>
         </select>
       </div>
 
       <div class="form-group">
-        <label class="form-label" for="api-key-input">API Secret / Bearer Token:</label>
-        <input type="password" id="api-key-input" class="form-control form-control-mono" placeholder="Paste live API key (stored in local browser)">
-        <span class="form-hint">Leaves browser memory unshared · 100% Zero-Knowledge</span>
+        <label class="form-label" for="api-key-input">API Key / Token (Optional):</label>
+        <input type="password" id="api-key-input" class="form-control form-control-mono" placeholder="Paste your API key">
+        <div class="form-field-footer">
+          <span class="form-hint">Stored safely in your local browser only</span>
+        </div>
       </div>
 
-      <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px;">
-        <button type="button" id="btn-save-api-key" class="btn btn-primary btn-sm">Save & Enable Live API</button>
+      <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px;">
+        <button type="button" id="btn-save-api-key" class="btn btn-primary btn-sm">Save Settings</button>
       </div>
     </div>
   </div>
 
-  <!-- jsQR Library for Real Client-Side QR Decoding -->
+  <!-- jsQR Library for Client-Side QR Decoding -->
   <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
 
-  <!-- Core Engine Scripts -->
+  <!-- Core Scripts -->
   <script src="js/gstRules.js"></script>
   <script src="js/apiConnector.js"></script>
   <script src="js/validator.js"></script>

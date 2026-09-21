@@ -1,6 +1,6 @@
 /* ==========================================================================
-   AUTOMATED GST & INVOICE VALIDATOR — LAYOUT & STRUCTURAL GRID
-   Author: Priyanshu Pandey (IQ4U8)
+   AUTOMATED GST & INVOICE VALIDATOR — RESPONSIVE LAYOUT & GRID
+   Clean Warm Ivory / Accounting Layout System
    ========================================================================== */
 
 * {
@@ -9,25 +9,35 @@
   padding: 0;
 }
 
+html {
+  font-size: 16px;
+}
+
 body {
   font-family: var(--font-sans);
   background-color: var(--bg);
-  background-image: var(--bg-gradient);
-  background-attachment: fixed;
-  color: var(--text-main);
+  color: var(--text-body);
   min-height: 100vh;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 /* App Wrapper */
 .app-container {
-  max-width: 1440px;
+  max-width: 1400px;
   margin: 0 auto;
-  padding: 24px 28px 60px 28px;
+  padding: 20px 24px 60px 24px;
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 20px;
+}
+
+@media (max-width: 768px) {
+  .app-container {
+    padding: 14px 14px 40px 14px;
+    gap: 16px;
+  }
 }
 
 /* Top App Header */
@@ -37,8 +47,11 @@ body {
   align-items: center;
   flex-wrap: wrap;
   gap: 16px;
-  padding-bottom: 20px;
-  border-bottom: 1px solid var(--border-subtle);
+  padding: 16px 20px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
 }
 
 .brand-section {
@@ -50,81 +63,99 @@ body {
 .brand-icon {
   width: 44px;
   height: 44px;
-  border-radius: var(--radius-md);
-  background: linear-gradient(135deg, var(--emerald), var(--cyan));
+  border-radius: var(--radius-sm);
+  background: var(--primary-navy);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--text-inverse);
-  box-shadow: var(--shadow-emerald);
+  color: #ffffff;
+  box-shadow: var(--shadow-xs);
   flex-shrink: 0;
 }
 
 .brand-icon svg {
-  width: 26px;
-  height: 26px;
+  width: 24px;
+  height: 24px;
 }
 
 .brand-title {
-  font-size: 1.35rem;
+  font-size: 1.25rem;
   font-weight: 800;
-  letter-spacing: -0.02em;
-  color: var(--text-main);
+  letter-spacing: -0.01em;
+  color: var(--text-navy);
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
 }
 
 .brand-badge {
-  font-size: 0.7rem;
-  padding: 2px 8px;
+  font-size: 0.75rem;
+  padding: 3px 9px;
   border-radius: var(--radius-full);
-  background: var(--emerald-soft);
-  color: var(--emerald);
-  border: 1px solid var(--border-strong);
+  background: var(--accent-gold-soft);
+  color: var(--accent-gold);
+  border: 1px solid var(--accent-gold-border);
   font-weight: 700;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
 }
 
 .brand-subtitle {
-  font-size: 0.85rem;
+  font-size: 0.875rem;
   color: var(--text-muted);
+  margin-top: 3px;
 }
 
 /* Header Controls */
 .header-actions {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   flex-wrap: wrap;
 }
 
-/* Executive Cockpit KPI Ribbon */
+@media (max-width: 600px) {
+  .app-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .header-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+}
+
+/* Executive KPI Grid */
 .kpi-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 14px;
+}
+
+@media (max-width: 480px) {
+  .kpi-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
 }
 
 .kpi-card {
-  background: var(--bg-card);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-lg);
-  padding: 18px 20px;
-  backdrop-filter: blur(16px);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+  box-shadow: var(--shadow-xs);
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  transition: var(--transition-normal);
   position: relative;
-  overflow: hidden;
+  transition: var(--transition-fast);
 }
 
 .kpi-card:hover {
-  transform: translateY(-2px);
-  border-color: var(--border-medium);
-  box-shadow: var(--shadow-md);
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-sm);
 }
 
 .kpi-card::before {
@@ -135,104 +166,97 @@ body {
   right: 0;
   height: 3px;
   background: var(--border-subtle);
-  transition: var(--transition-fast);
 }
 
-.kpi-card.emerald::before { background: var(--emerald); }
-.kpi-card.cyan::before { background: var(--cyan); }
-.kpi-card.amber::before { background: var(--amber); }
-.kpi-card.rose::before { background: var(--rose); }
+.kpi-card.emerald::before { background: var(--emerald-green); }
+.kpi-card.cyan::before { background: var(--info-blue); }
+.kpi-card.amber::before { background: var(--accent-gold); }
+.kpi-card.rose::before { background: var(--rose-red); }
 
 /* Navigation Tabs */
 .tabs-nav {
   display: flex;
   align-items: center;
-  gap: 8px;
-  border-bottom: 1px solid var(--border-subtle);
-  padding-bottom: 4px;
+  gap: 6px;
+  background: var(--bg-subtle-yellow);
+  padding: 6px 8px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-medium);
+  flex-wrap: wrap;
 }
 
 .tab-btn {
-  padding: 10px 18px;
-  border: none;
+  padding: 9px 20px;
+  border: 1px solid transparent;
   background: transparent;
   color: var(--text-muted);
-  font-size: 0.92rem;
+  font-size: 0.9375rem;
   font-weight: 600;
-  border-radius: var(--radius-md) var(--radius-md) 0 0;
+  border-radius: var(--radius-sm);
   cursor: pointer;
   display: flex;
   align-items: center;
   gap: 8px;
   transition: var(--transition-fast);
-  position: relative;
 }
 
 .tab-btn:hover {
   color: var(--text-main);
-  background: var(--bg-surface-elevated);
+  background: rgba(255, 255, 255, 0.6);
 }
 
 .tab-btn.active {
-  color: var(--emerald);
+  color: var(--primary-navy);
   background: var(--bg-surface);
+  border-color: var(--border-medium);
+  box-shadow: var(--shadow-xs);
 }
 
-.tab-btn.active::after {
-  content: '';
-  position: absolute;
-  bottom: -5px;
-  left: 0;
-  right: 0;
-  height: 3px;
-  background: var(--emerald);
-  border-radius: 3px 3px 0 0;
-}
-
-/* Workspace Sections */
+/* Tab Content */
 .tab-content {
   display: none;
-  animation: fadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .tab-content.active {
   display: block;
 }
 
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(6px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
 /* Mode 1: Inspector Grid */
 .inspector-layout {
   display: grid;
-  grid-template-columns: 1.45fr 1fr;
-  gap: 24px;
+  grid-template-columns: 1.4fr 1fr;
+  gap: 20px;
   align-items: start;
 }
 
-@media (max-width: 1080px) {
+@media (max-width: 1040px) {
   .inspector-layout {
     grid-template-columns: 1fr;
   }
 }
 
-/* Form Sections */
+/* Panel Containers */
 .panel {
-  background: var(--bg-card);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-lg);
-  padding: 24px;
-  backdrop-filter: blur(16px);
-  box-shadow: var(--shadow-sm);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-md);
+  padding: 20px;
+  box-shadow: var(--shadow-xs);
+}
+
+@media (max-width: 600px) {
+  .panel {
+    padding: 14px;
+  }
 }
 
 .panel-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 20px;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 18px;
   padding-bottom: 12px;
   border-bottom: 1px solid var(--border-subtle);
 }
@@ -240,47 +264,51 @@ body {
 .panel-title {
   font-size: 1.1rem;
   font-weight: 700;
+  color: var(--text-navy);
   display: flex;
   align-items: center;
-  gap: 10px;
-  color: var(--text-main);
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 /* Mode 2: Bulk Auditor Grid */
 .bulk-layout {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 18px;
 }
 
 .bulk-dropzone-container {
   display: grid;
-  grid-template-columns: 1.2fr 1fr;
-  gap: 20px;
+  grid-template-columns: 1.1fr 1fr;
+  gap: 18px;
 }
 
-@media (max-width: 900px) {
+@media (max-width: 860px) {
   .bulk-dropzone-container {
     grid-template-columns: 1fr;
   }
 }
 
-/* Footer info */
+/* Footer */
 .app-footer {
-  margin-top: 40px;
-  padding-top: 20px;
-  border-top: 1px solid var(--border-subtle);
+  margin-top: 30px;
+  padding: 16px 20px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-md);
   display: flex;
   justify-content: space-between;
   align-items: center;
   flex-wrap: wrap;
-  gap: 12px;
-  font-size: 0.82rem;
-  color: var(--text-faint);
+  gap: 10px;
+  font-size: 0.85rem;
+  color: var(--text-muted);
 }
 
 .app-footer a {
-  color: var(--emerald);
+  color: var(--primary-navy);
+  font-weight: 600;
   text-decoration: none;
 }
 

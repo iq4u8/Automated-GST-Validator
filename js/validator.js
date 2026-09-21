@@ -48,7 +48,7 @@ const GSTValidator = (() => {
         ruleId: "R1_SUPPLIER_GSTIN_MISSING",
         severity: "CRITICAL",
         title: "Supplier GSTIN Missing",
-        desc: "Every tax invoice must feature the registered Supplier GSTIN.",
+        desc: "Every tax invoice must specify the registered supplier's 15-digit GSTIN under Section 31 of the CGST Act.",
         autoFixable: false
       });
       score -= 30;
@@ -58,9 +58,9 @@ const GSTValidator = (() => {
         violations.push({
           ruleId: "R1_SUPPLIER_GSTIN_INVALID",
           severity: "CRITICAL",
-          title: "Supplier GSTIN Checksum Mismatch",
-          desc: `${gCheck.message}. Calculated expected character '${gCheck.expectedChar}', but invoice has '${gCheck.actualChar}'.`,
-          fixHint: `Correct Supplier GSTIN 15th checksum character to '${gCheck.expectedChar}'.`,
+          title: "Supplier GSTIN Check Digit Error",
+          desc: `The 15th check digit of supplier GSTIN '${supplierGstin}' failed the official Modulo 36 formula. Expected '${gCheck.expectedChar}', but bill shows '${gCheck.actualChar}'.`,
+          fixHint: `Change the last character of Supplier GSTIN to '${gCheck.expectedChar}'.`,
           autoFixable: true,
           fixType: "CORRECT_SUPPLIER_GSTIN",
           suggestedChar: gCheck.expectedChar
@@ -70,7 +70,7 @@ const GSTValidator = (() => {
         passes.push({
           ruleId: "R1_SUPPLIER_GSTIN_PASS",
           title: "Supplier GSTIN Verified",
-          desc: `Valid 15-character GSTIN verified against Modulo 36 algorithm (${gCheck.stateName}).`
+          desc: `Valid 15-digit GSTIN registered in ${gCheck.stateName} (State Code ${gCheck.stateCode}).`
         });
       }
     }
@@ -81,8 +81,8 @@ const GSTValidator = (() => {
         violations.push({
           ruleId: "R2_RECIPIENT_GSTIN_MISSING",
           severity: "CRITICAL",
-          title: "B2B Buyer GSTIN Missing",
-          desc: "Under Section 31 of CGST Act, B2B invoices strictly mandate recipient GSTIN to claim ITC.",
+          title: "Buyer GSTIN Missing on B2B Invoice",
+          desc: "For B2B invoices, the buyer's GSTIN is mandatory under Section 31. Without it, the buyer cannot claim Input Tax Credit (ITC) in GSTR-2B.",
           autoFixable: false
         });
         score -= 25;
@@ -92,9 +92,9 @@ const GSTValidator = (() => {
           violations.push({
             ruleId: "R2_RECIPIENT_GSTIN_INVALID",
             severity: "CRITICAL",
-            title: "Recipient GSTIN Checksum Mismatch",
-            desc: `${rCheck.message}. Checksum failed for buyer PAN.`,
-            fixHint: `Correct Buyer GSTIN checksum character to '${rCheck.expectedChar}'.`,
+            title: "Buyer GSTIN Check Digit Error",
+            desc: `The buyer's GSTIN '${recipientGstin}' has an invalid check digit. Calculated expected character is '${rCheck.expectedChar}'.`,
+            fixHint: `Change the last character of Buyer GSTIN to '${rCheck.expectedChar}'.`,
             autoFixable: true,
             fixType: "CORRECT_RECIPIENT_GSTIN",
             suggestedChar: rCheck.expectedChar
@@ -104,7 +104,7 @@ const GSTValidator = (() => {
           passes.push({
             ruleId: "R2_RECIPIENT_GSTIN_PASS",
             title: "Buyer GSTIN Verified",
-            desc: `Valid Buyer GSTIN for ITC claiming (${rCheck.stateName}).`
+            desc: `Valid buyer GSTIN for ${rCheck.stateName}. Eligible for Input Tax Credit.`
           });
         }
       }
@@ -116,8 +116,8 @@ const GSTValidator = (() => {
           violations.push({
             ruleId: "R2_B2C_GSTIN_WARN",
             severity: "WARNING",
-            title: "Unverified Consumer GSTIN Provided",
-            desc: `A GSTIN was specified on a B2C bill, but its checksum failed (${rCheck.message}).`,
+            title: "Invalid GSTIN Entered on Retail Bill",
+            desc: `A GSTIN was specified for a retail consumer bill, but its check digit is invalid (${rCheck.message}).`,
             autoFixable: false
           });
           score -= 5;
@@ -137,9 +137,9 @@ const GSTValidator = (() => {
         violations.push({
           ruleId: "R3_POS_INTRA_ILLEGAL_IGST",
           severity: "CRITICAL",
-          title: "Illegal IGST on Intra-State Supply",
-          desc: `Supplier State (${supplierStateCode} - ${posEval.supplierState}) and Place of Supply (${posStateCode} - ${posEval.posState}) are identical. Charging IGST (₹${declaredIgst.toFixed(2)}) is a statutory violation. Must charge equal CGST + SGST.`,
-          fixHint: "Convert declared IGST into equal 50/50 split of CGST and SGST.",
+          title: "Wrong Tax Charged: IGST on Local Intra-State Supply",
+          desc: `Both the seller and the Place of Supply are in ${posEval.supplierState} (Code ${supplierStateCode}). Under Section 8 of the IGST Act, local sales require equal CGST + SGST (50% each). Integrated Tax (IGST ₹${declaredIgst.toFixed(2)}) cannot be charged here. Buyer's GST portal will reject the ITC.`,
+          fixHint: "Split declared IGST into equal 50% CGST and 50% SGST.",
           autoFixable: true,
           fixType: "SPLIT_TO_CGST_SGST"
         });
@@ -148,8 +148,8 @@ const GSTValidator = (() => {
         violations.push({
           ruleId: "R3_POS_INTRA_MISSING_TAX",
           severity: "WARNING",
-          title: "Intra-State CGST/SGST Not Charged",
-          desc: "Taxable transaction in same state but CGST/SGST values are zero (unless exempt/zero-rated).",
+          title: "Local CGST & SGST Not Charged",
+          desc: "Transaction is within the same state with positive taxable value, but CGST/SGST amounts are zero (unless goods are specifically exempt).",
           autoFixable: false
         });
         score -= 10;
@@ -157,9 +157,9 @@ const GSTValidator = (() => {
         violations.push({
           ruleId: "R3_POS_ASYMMETRIC_SPLIT",
           severity: "CRITICAL",
-          title: "CGST and SGST Unequal Split Mismatch",
-          desc: `Statutory mandate requires CGST (₹${declaredCgst.toFixed(2)}) and SGST (₹${declaredSgst.toFixed(2)}) to be 100% equal. Difference: ₹${Math.abs(declaredCgst - declaredSgst).toFixed(2)}.`,
-          fixHint: "Balance CGST and SGST to exact 50% split.",
+          title: "Unequal CGST and SGST Split",
+          desc: `Under GST rules, CGST (₹${declaredCgst.toFixed(2)}) and SGST (₹${declaredSgst.toFixed(2)}) must always be exactly equal. Found a difference of ₹${Math.abs(declaredCgst - declaredSgst).toFixed(2)}.`,
+          fixHint: "Balance CGST and SGST into exact 50-50 equal amounts.",
           autoFixable: true,
           fixType: "BALANCE_CGST_SGST"
         });
@@ -167,8 +167,8 @@ const GSTValidator = (() => {
       } else {
         passes.push({
           ruleId: "R3_POS_INTRA_PASS",
-          title: "Intra-State Tax Structure Valid",
-          desc: `Clean Intra-State transaction (${supplierStateCode} -> ${posStateCode}) with balanced CGST and SGST.`
+          title: "Local Intra-State Tax Split Verified",
+          desc: `Correctly mapped to equal CGST + SGST within ${posEval.supplierState}.`
         });
       }
     } else {
@@ -177,9 +177,9 @@ const GSTValidator = (() => {
         violations.push({
           ruleId: "R3_POS_INTER_ILLEGAL_CGST_SGST",
           severity: "CRITICAL",
-          title: "Illegal CGST/SGST on Inter-State Supply",
-          desc: `Supplier State (${supplierStateCode} - ${posEval.supplierState}) differs from Place of Supply (${posStateCode} - ${posEval.posState}). Charging local CGST/SGST on inter-state supply is disallowed. Must charge IGST.`,
-          fixHint: "Merge CGST + SGST into singular IGST rate and zero out local taxes.",
+          title: "Wrong Tax Charged: CGST/SGST on Inter-State Supply",
+          desc: `Seller is located in ${posEval.supplierState} (Code ${supplierStateCode}) but delivery location is ${posEval.posState} (Code ${posStateCode}). Under Section 7 of the IGST Act, inter-state transactions strictly require Integrated Tax (IGST). Local CGST and SGST cannot be charged.`,
+          fixHint: "Combine CGST and SGST into a single IGST amount and set local taxes to zero.",
           autoFixable: true,
           fixType: "MERGE_TO_IGST"
         });
@@ -188,16 +188,16 @@ const GSTValidator = (() => {
         violations.push({
           ruleId: "R3_POS_INTER_MISSING_IGST",
           severity: "WARNING",
-          title: "Inter-State IGST Not Charged",
-          desc: "Inter-state supply with positive taxable amount but IGST is zero.",
+          title: "Inter-State IGST Not Added",
+          desc: "Inter-state supply has taxable value, but IGST amount is ₹0.00.",
           autoFixable: false
         });
         score -= 10;
       } else {
         passes.push({
           ruleId: "R3_POS_INTER_PASS",
-          title: "Inter-State Tax Structure Valid",
-          desc: `Clean Inter-State transaction (${supplierStateCode} -> ${posStateCode}) mapped to IGST.`
+          title: "Inter-State IGST Structure Verified",
+          desc: `Correctly mapped to IGST for supply from ${posEval.supplierState} to ${posEval.posState}.`
         });
       }
     }
@@ -206,7 +206,7 @@ const GSTValidator = (() => {
     const lineItems = Array.isArray(invoice.items) && invoice.items.length > 0
       ? invoice.items
       : [{
-          description: "General Supply",
+          description: "General Supply Item",
           hsn: invoice.hsn || "998314",
           qty: 1,
           rate: invoice.taxableAmount || 0,
@@ -218,8 +218,6 @@ const GSTValidator = (() => {
     let computedCgstSum = 0;
     let computedSgstSum = 0;
     let computedIgstSum = 0;
-    let hasNonStandardSlab = false;
-    let hasMathDrift = false;
 
     lineItems.forEach((item, idx) => {
       const qty = Number(item.qty || 1);
@@ -232,12 +230,11 @@ const GSTValidator = (() => {
 
       // Slab check
       if (!GSTRules.isStandardSlab(taxRate)) {
-        hasNonStandardSlab = true;
         violations.push({
           ruleId: `R4_NON_STANDARD_SLAB_ITEM_${idx + 1}`,
           severity: "WARNING",
-          title: `Non-Standard GST Slab (${taxRate}%) on Item ${idx + 1}`,
-          desc: `Rate ${taxRate}% does not match official GST slabs (0%, 0.1%, 0.25%, 1.5%, 3%, 5%, 12%, 18%, 28%).`,
+          title: `Non-Standard Tax Rate (${taxRate}%) on Item ${idx + 1}`,
+          desc: `Item '${item.description || `Row ${idx + 1}`}' uses a ${taxRate}% rate. Official GST slabs are 0%, 0.1%, 0.25%, 1.5%, 3%, 5%, 12%, 18%, and 28%.`,
           autoFixable: false
         });
         score -= 5;
@@ -248,8 +245,8 @@ const GSTValidator = (() => {
         violations.push({
           ruleId: `R5_INVALID_HSN_ITEM_${idx + 1}`,
           severity: "WARNING",
-          title: `Invalid HSN/SAC Code '${item.hsn}'`,
-          desc: "HSN/SAC must be 4, 6, or 8 numeric digits.",
+          title: `Invalid HSN / SAC Code '${item.hsn}' on Item ${idx + 1}`,
+          desc: "HSN / SAC must be 4, 6, or 8 digits as prescribed by the GST Council.",
           autoFixable: false
         });
         score -= 5;
@@ -269,13 +266,12 @@ const GSTValidator = (() => {
     const declaredTaxable = Number(invoice.taxableAmount || 0);
     const taxableDiff = Math.abs(declaredTaxable - computedTaxableSum);
     if (taxableDiff > 1.00) {
-      hasMathDrift = true;
       violations.push({
         ruleId: "R5_TAXABLE_ARITHMETIC_DRIFT",
         severity: "CRITICAL",
-        title: "Taxable Value Precision Drift",
-        desc: `Declared Taxable Amount (₹${declaredTaxable.toFixed(2)}) deviates from line-items calculation sum (₹${computedTaxableSum.toFixed(2)}) by ₹${taxableDiff.toFixed(2)}.`,
-        fixHint: `Update invoice taxable amount to ₹${computedTaxableSum.toFixed(2)}.`,
+        title: "Item Subtotal Does Not Match Taxable Amount",
+        desc: `Sum of item rows after discount is ₹${computedTaxableSum.toFixed(2)}, but invoice states ₹${declaredTaxable.toFixed(2)} (difference: ₹${taxableDiff.toFixed(2)}).`,
+        fixHint: `Align invoice taxable amount to item subtotal (₹${computedTaxableSum.toFixed(2)}).`,
         autoFixable: true,
         fixType: "ALIGN_TAXABLE_AMOUNT",
         correctTaxable: computedTaxableSum
@@ -284,8 +280,8 @@ const GSTValidator = (() => {
     } else {
       passes.push({
         ruleId: "R5_MATH_PRECISION_PASS",
-        title: "Line Item Mathematics Verified",
-        desc: `All ${lineItems.length} line items align with subtotal arithmetic (₹${computedTaxableSum.toFixed(2)}).`
+        title: "Line Item Calculations Verified",
+        desc: `All ${lineItems.length} item rows match the taxable subtotal of ₹${computedTaxableSum.toFixed(2)}.`
       });
     }
 
@@ -298,8 +294,8 @@ const GSTValidator = (() => {
       violations.push({
         ruleId: "R6_TAX_AMOUNT_MISMATCH",
         severity: "CRITICAL",
-        title: "Total GST Calculation Mismatch",
-        desc: `Declared tax (₹${totalDeclaredTax.toFixed(2)}) does not match statutory formula rate computation (₹${totalComputedTax.toFixed(2)}). Difference: ₹${taxDiff.toFixed(2)}.`,
+        title: "Tax Amount Calculation Mismatch",
+        desc: `Declared total GST (₹${totalDeclaredTax.toFixed(2)}) differs from item rate calculation (₹${totalComputedTax.toFixed(2)}) by ₹${taxDiff.toFixed(2)}.`,
         fixHint: posEval.isIntraState
           ? `Set CGST to ₹${computedCgstSum.toFixed(2)} and SGST to ₹${computedSgstSum.toFixed(2)}.`
           : `Set IGST to ₹${computedIgstSum.toFixed(2)}.`,
@@ -323,8 +319,8 @@ const GSTValidator = (() => {
       violations.push({
         ruleId: "R7_ROUNDOFF_EXCESS",
         severity: "WARNING",
-        title: "Excessive Round-Off Tolerance",
-        desc: `Declared round-off ₹${declaredRoundOff.toFixed(2)} exceeds standard statutory ±₹1.00 margin.`,
+        title: "Round-Off Exceeds Normal ±₹1.00 Margin",
+        desc: `Declared round-off ₹${declaredRoundOff.toFixed(2)} is outside standard accounting tolerance (±₹1.00).`,
         autoFixable: true,
         fixType: "CORRECT_ROUNDOFF",
         correctRoundOff: computedRoundOff
@@ -337,9 +333,9 @@ const GSTValidator = (() => {
       violations.push({
         ruleId: "R7_GRAND_TOTAL_MISMATCH",
         severity: "CRITICAL",
-        title: "Grand Total Inconsistency",
-        desc: `Declared Grand Total (₹${declaredGrandTotal.toFixed(2)}) deviates from verified Taxable + GST sum (₹${standardRoundedTotal.toFixed(2)}).`,
-        fixHint: `Align Grand Total to ₹${standardRoundedTotal.toFixed(2)}.`,
+        title: "Invoice Grand Total Inconsistency",
+        desc: `Declared Grand Total (₹${declaredGrandTotal.toFixed(2)}) does not match Taxable Subtotal + GST + Round-off (₹${standardRoundedTotal.toFixed(2)}).`,
+        fixHint: `Align Grand Total to verified total ₹${standardRoundedTotal.toFixed(2)}.`,
         autoFixable: true,
         fixType: "ALIGN_GRAND_TOTAL",
         correctGrandTotal: standardRoundedTotal
@@ -348,8 +344,8 @@ const GSTValidator = (() => {
     } else {
       passes.push({
         ruleId: "R7_ROUNDOFF_PASS",
-        title: "Statutory Round-Off Compliant",
-        desc: `Grand Total aligns with Indian statutory limits (±₹1.00 round-off standard).`
+        title: "Grand Total & Round-Off Verified",
+        desc: "Invoice grand total matches taxable amount plus taxes within standard round-off limits."
       });
     }
 
@@ -358,8 +354,8 @@ const GSTValidator = (() => {
       violations.push({
         ruleId: "R8_INVALID_INVOICE_NUM",
         severity: "WARNING",
-        title: "Invoice Number Rule 46 Non-Compliant",
-        desc: `Invoice number '${invoiceNumber}' exceeds 16 chars or contains forbidden characters (only alphanumeric, '-' and '/' allowed).`,
+        title: "Invoice Number Does Not Comply with Rule 46",
+        desc: `Invoice number '${invoiceNumber}' exceeds 16 characters or contains special characters other than hyphens and slashes.`,
         autoFixable: false
       });
       score -= 10;
@@ -372,8 +368,8 @@ const GSTValidator = (() => {
         violations.push({
           ruleId: "R8_FUTURE_DATE",
           severity: "CRITICAL",
-          title: "Future Invoice Date Detected",
-          desc: `Invoice date (${invoiceDate}) is ahead of current date. Future-dated tax invoices violate GST Rule 47.`,
+          title: "Invoice Date Cannot Be in the Future",
+          desc: `Invoice date (${invoiceDate}) is forward-dated. Under GST Rule 47, invoices cannot be issued with future dates.`,
           autoFixable: false
         });
         score -= 15;
@@ -386,8 +382,8 @@ const GSTValidator = (() => {
         violations.push({
           ruleId: "R9_HIGH_VALUE_B2C_UNRECORDED",
           severity: "CRITICAL",
-          title: "High-Value B2C Interstate Threshold Violation",
-          desc: `Invoice taxable value ₹${declaredTaxable.toLocaleString("en-IN")} exceeds ₹2,50,000 threshold for inter-state consumer supply. Rule 46(f) mandates capturing recipient state code & address.`,
+          title: "High-Value Consumer Interstate Sale: Missing Address",
+          desc: `Invoice taxable amount ₹${declaredTaxable.toLocaleString("en-IN")} exceeds the ₹2,50,000 threshold for inter-state retail sales. Under Rule 46(f), capturing customer name, state code, and delivery address is mandatory.`,
           autoFixable: false
         });
         score -= 25;
@@ -399,8 +395,8 @@ const GSTValidator = (() => {
       violations.push({
         ruleId: "R10_RCM_NOTIFICATION",
         severity: "WARNING",
-        title: "Reverse Charge Mechanism (RCM) Active",
-        desc: "Supplier cannot collect tax from recipient. Recipient must self-pay GST directly to the Government.",
+        title: "Reverse Charge (RCM) Applicable",
+        desc: "Tax on this invoice is payable directly by the recipient to the government. Seller will not collect tax on bill.",
         autoFixable: false
       });
     }
@@ -412,15 +408,15 @@ const GSTValidator = (() => {
           ruleId: "R10_IRN_CORRUPT",
           severity: "CRITICAL",
           title: "Malformed E-Invoice IRN Hash",
-          desc: `Declared IRN hash length is ${irn.length} chars (must be exactly 64 hexadecimal characters).`,
+          desc: `Declared IRN length is ${irn.length} characters. Must be an exact 64-character hexadecimal SHA-256 hash issued by IRP.`,
           autoFixable: false
         });
         score -= 15;
       } else {
         passes.push({
           ruleId: "R10_IRN_PASS",
-          title: "E-Invoice IRN Hash Valid",
-          desc: "Valid 64-character SHA-256 e-invoice Invoice Reference Number."
+          title: "E-Invoice IRN Hash Verified",
+          desc: "Valid 64-character SHA-256 Invoice Reference Number."
         });
       }
     }

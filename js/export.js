@@ -107,20 +107,20 @@ const AuditExport = (() => {
             <div style="font-size: 0.78rem; color: #475569; margin-top: 2px;">${v.desc}</div>
           </div>
         `).join("")
-      : `<div style="padding: 10px; background: #ecfdf5; color: #065f46; border-radius: 6px; font-weight: 600; font-size: 0.85rem;">✓ Zero Statutory Violations. 100% Compliant with Indian GST Standards.</div>`;
+      : `<div style="padding: 10px; background: #ecfdf5; color: #065f46; border-radius: 6px; font-weight: 600; font-size: 0.85rem;">✓ All 10 GST Statutory Checks Cleared. Invoice is compliant for tax filing.</div>`;
 
     const html = `
       <div style="font-family: 'Inter', sans-serif; color: #0f172a; padding: 10px;">
         <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #10b981; padding-bottom: 12px; margin-bottom: 16px;">
           <div>
-            <h2 style="font-size: 1.25rem; font-weight: 800; color: #0f172a; margin: 0;">GST COMPLIANCE AUDIT CERTIFICATE</h2>
-            <div style="font-size: 0.8rem; color: #64748b; margin-top: 2px;">Statutory Verification Under CGST/SGST/IGST Act & Rules</div>
+            <h2 style="font-size: 1.25rem; font-weight: 800; color: #0f172a; margin: 0;">GST INVOICE AUDIT REPORT</h2>
+            <div style="font-size: 0.85rem; color: #64748b; margin-top: 2px;">Verification Under CGST, SGST & IGST Acts and Rules</div>
           </div>
           <div style="text-align: right;">
-            <span style="display: inline-block; padding: 4px 12px; border-radius: 9999px; font-weight: 800; font-size: 0.9rem; background: ${auditResult.status === 'PASS' ? '#ecfdf5' : '#fff1f2'}; color: ${auditResult.status === 'PASS' ? '#059669' : '#e11d48'}; border: 1px solid currentColor;">
+            <span style="display: inline-block; padding: 4px 12px; border-radius: 9999px; font-weight: 800; font-size: 0.85rem; background: ${auditResult.status === 'PASS' ? '#ecfdf5' : '#fff1f2'}; color: ${auditResult.status === 'PASS' ? '#059669' : '#e11d48'}; border: 1px solid currentColor;">
               AUDIT STATUS: ${auditResult.status} (${auditResult.score}/100)
             </span>
-            <div style="font-size: 0.75rem; color: #94a3b8; margin-top: 4px;">Verified: ${new Date().toLocaleString()}</div>
+            <div style="font-size: 0.78rem; color: #64748b; margin-top: 4px;">Verified: ${new Date().toLocaleDateString("en-IN")}</div>
           </div>
         </div>
 
