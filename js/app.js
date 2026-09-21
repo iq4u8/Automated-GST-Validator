@@ -23,6 +23,9 @@ document.addEventListener("DOMContentLoaded", () => {
   initTabs();
   initBulkDropzone();
   initModalListeners();
+  initLiveLookupHandlers();
+  initEInvoiceQRHandlers();
+  initApiSettingsHandlers();
 
   // Load Preset 1 by default
   loadScenarioById("preset_1");
@@ -636,6 +639,245 @@ document.addEventListener("DOMContentLoaded", () => {
     const closeBtn = document.getElementById("modal-close-btn");
     if (closeBtn && modal) {
       closeBtn.addEventListener("click", () => modal.classList.remove("open"));
+    }
+  }
+
+  // --- LIVE TAXPAYER LOOKUP CONTROLLER ---
+  function initLiveLookupHandlers() {
+    const btnSupplier = document.getElementById("btn-lookup-supplier");
+    const btnRecipient = document.getElementById("btn-lookup-recipient");
+    const taxModal = document.getElementById("taxpayer-modal");
+    const taxModalClose = document.getElementById("taxpayer-modal-close");
+    const taxModalBody = document.getElementById("taxpayer-modal-body");
+
+    if (taxModalClose && taxModal) {
+      taxModalClose.addEventListener("click", () => taxModal.classList.remove("open"));
+    }
+
+    async function handleLookup(gstinInputId, targetRole) {
+      const inputEl = document.getElementById(gstinInputId);
+      const gstin = inputEl ? inputEl.value.trim() : "";
+      if (!gstin) {
+        showToast("Please enter a GSTIN first.", "error");
+        return;
+      }
+
+      showToast(`Querying Live GSTN Gateway for ${gstin}...`, "info");
+
+      try {
+        const record = await GSTApiConnector.lookupTaxpayerLive(gstin);
+        renderTaxpayerModal(record, targetRole);
+        if (taxModal) taxModal.classList.add("open");
+      } catch (err) {
+        showToast(err.message, "error");
+      }
+    }
+
+    if (btnSupplier) {
+      btnSupplier.addEventListener("click", () => handleLookup("supplier-gstin", "supplier"));
+    }
+    if (btnRecipient) {
+      btnRecipient.addEventListener("click", () => handleLookup("recipient-gstin", "recipient"));
+    }
+
+    function renderTaxpayerModal(rec, targetRole) {
+      if (!taxModalBody) return;
+      taxModalBody.innerHTML = `
+        <div style="font-family: inherit; color: var(--text-main);">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; padding-bottom: 10px; border-bottom: 1px solid var(--border-subtle);">
+            <div>
+              <span class="badge ${rec.status === 'Active' ? 'badge-pass' : 'badge-fail'}" style="font-size: 0.8rem;">
+                ● STATUS: ${rec.status.toUpperCase()}
+              </span>
+              <span class="badge badge-info" style="margin-left: 6px;">${rec.source}</span>
+            </div>
+            <span style="font-family: var(--font-mono); font-weight: 700; color: var(--emerald);">${rec.gstin}</span>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr; gap: 12px; font-size: 0.88rem;">
+            <div style="background: var(--bg-surface-elevated); padding: 12px; border-radius: var(--radius-sm); border: 1px solid var(--border-subtle);">
+              <div style="font-size: 0.72rem; text-transform: uppercase; color: var(--text-muted); font-weight: 700;">Legal Business Name</div>
+              <div style="font-size: 1.05rem; font-weight: 800; color: var(--text-main); margin-top: 2px;">${rec.legalName}</div>
+              <div style="font-size: 0.82rem; color: var(--cyan); margin-top: 2px;">Trade: ${rec.tradeName}</div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+              <div style="background: var(--bg-surface-elevated); padding: 10px; border-radius: var(--radius-sm); border: 1px solid var(--border-subtle);">
+                <div style="font-size: 0.72rem; color: var(--text-muted);">Constitution & Type</div>
+                <div style="font-weight: 600;">${rec.constitution || rec.taxpayerType}</div>
+              </div>
+              <div style="background: var(--bg-surface-elevated); padding: 10px; border-radius: var(--radius-sm); border: 1px solid var(--border-subtle);">
+                <div style="font-size: 0.72rem; color: var(--text-muted);">Registration Date</div>
+                <div style="font-weight: 600;">${rec.registrationDate}</div>
+              </div>
+            </div>
+
+            <div style="background: var(--bg-surface-elevated); padding: 10px; border-radius: var(--radius-sm); border: 1px solid var(--border-subtle);">
+              <div style="font-size: 0.72rem; color: var(--text-muted);">Principal Place of Business</div>
+              <div style="font-weight: 500; font-size: 0.84rem; line-height: 1.4; margin-top: 2px;">${rec.address}</div>
+            </div>
+          </div>
+
+          <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px;">
+            <button type="button" id="btn-populate-taxpayer" class="btn btn-primary btn-sm">
+              ✓ Auto-Populate Into Invoice
+            </button>
+          </div>
+        </div>
+      `;
+
+      const popBtn = document.getElementById("btn-populate-taxpayer");
+      if (popBtn) {
+        popBtn.addEventListener("click", () => {
+          if (targetRole === "supplier") {
+            document.getElementById("supplier-name").value = rec.legalName;
+            showToast(`Populated Supplier: ${rec.legalName}`, "success");
+          } else {
+            document.getElementById("recipient-name").value = rec.legalName;
+            const posSelect = document.getElementById("place-of-supply");
+            if (posSelect && rec.stateCode) {
+              for (let i = 0; i < posSelect.options.length; i++) {
+                if (posSelect.options[i].value.startsWith(rec.stateCode)) {
+                  posSelect.selectedIndex = i;
+                  break;
+                }
+              }
+            }
+            showToast(`Populated Recipient: ${rec.legalName}`, "success");
+          }
+          taxModal.classList.remove("open");
+          collectFormData();
+          runLiveAudit();
+        });
+      }
+    }
+  }
+
+  // --- E-INVOICE QR CODE CONTROLLER ---
+  function initEInvoiceQRHandlers() {
+    const scanBtn = document.getElementById("btn-scan-qr");
+    const qrModal = document.getElementById("qr-modal");
+    const qrModalClose = document.getElementById("qr-modal-close");
+    const qrDropzone = document.getElementById("qr-dropzone");
+    const qrFileInput = document.getElementById("qr-file-input");
+    const qrPaste = document.getElementById("qr-jwt-paste");
+    const btnSampleQr = document.getElementById("btn-load-sample-qr");
+    const btnDecode = document.getElementById("btn-decode-qr");
+
+    if (scanBtn && qrModal) {
+      scanBtn.addEventListener("click", () => qrModal.classList.add("open"));
+    }
+    if (qrModalClose && qrModal) {
+      qrModalClose.addEventListener("click", () => qrModal.classList.remove("open"));
+    }
+
+    if (qrDropzone && qrFileInput) {
+      qrDropzone.addEventListener("click", () => qrFileInput.click());
+      qrFileInput.addEventListener("change", async (e) => {
+        if (e.target.files.length > 0) {
+          showToast("Scanning QR code pattern...", "info");
+          try {
+            const qrText = await GSTApiConnector.scanQRFromImage(e.target.files[0]);
+            qrPaste.value = qrText;
+            showToast("QR code pattern scanned successfully!", "success");
+          } catch (err) {
+            showToast(err.message, "error");
+          }
+        }
+      });
+    }
+
+    if (btnSampleQr) {
+      btnSampleQr.addEventListener("click", () => {
+        const samplePayload = {
+          Iss: "NIC",
+          Data: {
+            SellerGstin: "27AABCU9603R1ZN",
+            BuyerGstin: "27AAACN1234A1Z7",
+            DocNo: "E-INV/2026/089",
+            DocTyp: "INV",
+            DocDt: "2026-09-18",
+            TotInvVal: 177000.0,
+            ItemCnt: 2,
+            MainHsnCode: "998314",
+            Irn: "a3b1c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3"
+          }
+        };
+        const sampleJwt = "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9." + btoa(JSON.stringify(samplePayload)) + ".mock_signature";
+        qrPaste.value = sampleJwt;
+        showToast("Loaded official NIC signed E-Invoice QR JWT!", "info");
+      });
+    }
+
+    if (btnDecode) {
+      btnDecode.addEventListener("click", () => {
+        const val = qrPaste.value.trim();
+        if (!val) {
+          showToast("Please upload an image or paste QR text first.", "error");
+          return;
+        }
+
+        try {
+          const decoded = GSTApiConnector.decodeEInvoiceQR(val);
+          document.getElementById("inv-number").value = decoded.docNo || "E-INV-01";
+          if (decoded.docDate) document.getElementById("inv-date").value = decoded.docDate;
+          if (decoded.sellerGstin) document.getElementById("supplier-gstin").value = decoded.sellerGstin;
+          if (decoded.buyerGstin) document.getElementById("recipient-gstin").value = decoded.buyerGstin;
+          if (decoded.irn) document.getElementById("inv-irn").value = decoded.irn;
+          if (decoded.totalValue) document.getElementById("inv-total").value = decoded.totalValue.toFixed(2);
+
+          // Auto calculate approximate taxable
+          const estTaxable = +(decoded.totalValue / 1.18).toFixed(2);
+          const estGst = +(decoded.totalValue - estTaxable).toFixed(2);
+          document.getElementById("inv-taxable").value = estTaxable.toFixed(2);
+          document.getElementById("inv-cgst").value = (estGst / 2).toFixed(2);
+          document.getElementById("inv-sgst").value = (estGst / 2).toFixed(2);
+          document.getElementById("inv-igst").value = "0.00";
+
+          qrModal.classList.remove("open");
+          collectFormData();
+          runLiveAudit();
+          showToast(`Ingested E-Invoice ${decoded.docNo} (${decoded.issuer || 'NIC'})!`, "success");
+        } catch (err) {
+          showToast("Failed to decode: " + err.message, "error");
+        }
+      });
+    }
+  }
+
+  // --- API SETTINGS CONTROLLER ---
+  function initApiSettingsHandlers() {
+    const apiBtn = document.getElementById("btn-api-settings");
+    const apiModal = document.getElementById("api-modal");
+    const apiModalClose = document.getElementById("api-modal-close");
+    const apiKeyInput = document.getElementById("api-key-input");
+    const apiProvider = document.getElementById("api-provider-select");
+    const saveBtn = document.getElementById("btn-save-api-key");
+
+    if (apiBtn && apiModal) {
+      apiBtn.addEventListener("click", () => {
+        apiKeyInput.value = localStorage.getItem("gst_api_key") || "";
+        apiProvider.value = localStorage.getItem("gst_api_provider") || "sandbox";
+        apiModal.classList.add("open");
+      });
+    }
+    if (apiModalClose && apiModal) {
+      apiModalClose.addEventListener("click", () => apiModal.classList.remove("open"));
+    }
+
+    if (saveBtn) {
+      saveBtn.addEventListener("click", () => {
+        const key = apiKeyInput.value.trim();
+        const provider = apiProvider.value;
+        if (key) {
+          localStorage.setItem("gst_api_key", key);
+        } else {
+          localStorage.removeItem("gst_api_key");
+        }
+        localStorage.setItem("gst_api_provider", provider);
+        apiModal.classList.remove("open");
+        showToast(`API Gateway configured: ${provider.toUpperCase()}`, "success");
+      });
     }
   }
 

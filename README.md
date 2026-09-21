@@ -48,6 +48,8 @@ GSTAlign performs a **10-pass algorithmic audit** directly inside the browser in
   - **Live Single Invoice Inspector:** Real-time form with dynamic line item addition, instant diagnostic badges, and **"1-Click Auto-Fix"** to auto-rebalance taxes and correct rounding discrepancies.
   - **Bulk Register & CSV Auditor:** Ingest multi-vendor invoice registers via drag-and-drop CSV, JSON, or direct clipboard copy-paste from Excel / Tally DayBooks.
 - 🎯 **Executive Health Cockpit:** Real-time compliance score (0–100%), assessed taxable metrics, and critical violation counters.
+- 🌐 **Live GSTN Taxpayer Verification API:** Real-time lookup connecting to GSTN sandbox and public developer APIs (Sandbox.co.in / Cashfree / MastersIndia) to fetch legal business names, registration dates, active statuses, and principal addresses with 1-click auto-fill.
+- 📷 **Official NIC Signed E-Invoice QR Decoder:** Decodes B2B e-invoice QR code images and signed JWT payloads under Rule 48(4) via client-side `jsQR` and base64 parser. Auto-extracts IRN, doc numbers, and tax totals.
 - 🧪 **5 Preloaded Enterprise Scenarios:** Instant demonstration presets showcasing clean passes, POS conflicts, mathematical drift, corrupted checksums, and high-value B2C violations.
 - 📊 **Executive Exports:** Download filtered discrepancy audit reports in CSV format or generate a printable Executive Compliance Certificate.
 - 🎨 **FinTech Emerald Aesthetic:** Glassmorphism UI with fluid animations, responsive layouts, and dynamic Dark / Light theme switching.
@@ -57,6 +59,8 @@ GSTAlign performs a **10-pass algorithmic audit** directly inside the browser in
 ## 🛠️ Technology Stack
 
 - **Core Logic:** Vanilla JavaScript (ES6+), pure client-side execution
+- **QR Decoding:** `jsQR` HTML5 Canvas scanning + Base64Url JWT parser
+- **APIs & Gateways:** REST API connector (Sandbox.co.in / Cashfree / Official GSTN Portal)
 - **Styling:** Vanilla CSS3 (Custom Design Tokens, Flexbox, CSS Grid)
 - **Security & Privacy:** Zero-Knowledge architecture (zero external network requests for financial data)
 - **Deployment:** Vercel Static Hosting (`vercel.json`)
@@ -67,7 +71,7 @@ GSTAlign performs a **10-pass algorithmic audit** directly inside the browser in
 
 ```
 Automated GST & Invoice Validator/
-├── index.html                 # Semantic Cockpit HTML
+├── index.html                 # Semantic Cockpit HTML with Live Lookup & QR Scanner
 ├── favicon.svg                # Vector Tax Shield Icon
 ├── vercel.json                # Static hosting & security configuration
 ├── README.md                  # Documentation & statutory specifications
@@ -77,6 +81,7 @@ Automated GST & Invoice Validator/
 │   └── components.css         # Health gauges, badge pills, line-items table, modal
 └── js/
     ├── gstRules.js            # Modulo 36 Luhn checksum, state codes, slab rules
+    ├── apiConnector.js        # Live Taxpayer Search API & NIC E-Invoice QR engine
     ├── validator.js           # Multi-pass statutory audit & 1-Click Auto-Fix engine
     ├── sampleData.js          # 5 enterprise test presets + 10-invoice bulk register
     ├── export.js              # CSV discrepancy exporter & printable audit slip

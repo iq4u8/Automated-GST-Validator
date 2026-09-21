@@ -40,6 +40,14 @@
       </div>
 
       <div class="header-actions">
+        <!-- Live E-Invoice QR & API Gateway Buttons -->
+        <button id="btn-scan-qr" class="btn btn-secondary btn-sm" title="Decode NIC Signed E-Invoice QR Code">
+          📷 E-Invoice QR
+        </button>
+        <button id="btn-api-settings" class="btn btn-secondary btn-sm" title="Live GSTN Verification API Gateway">
+          🌐 API Gateway
+        </button>
+
         <!-- Scenario Presets -->
         <div class="preset-selector">
           <label for="preset-select" style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted);">Scenario:</label>
@@ -145,9 +153,13 @@
               <div class="form-group">
                 <label class="form-label" for="supplier-gstin">
                   <span>Supplier GSTIN (15 Digits)</span>
-                  <span id="supplier-gstin-badge"></span>
+                  <span style="display: flex; align-items: center; gap: 6px;">
+                    <span id="supplier-gstin-badge"></span>
+                    <button type="button" id="btn-lookup-supplier" class="btn btn-secondary btn-sm" style="padding: 1px 7px; font-size: 0.7rem;">🔍 Live Lookup</button>
+                    <a id="link-official-supplier" href="https://services.gst.gov.in/services/searchtp" target="_blank" rel="noopener noreferrer" style="font-size: 0.7rem; color: var(--cyan); text-decoration: none;" title="Verify on official GST portal">Portal ↗</a>
+                  </span>
                 </label>
-                <input type="text" id="supplier-gstin" class="form-control form-control-mono" maxlength="15" placeholder="27AABCU9603R1ZM">
+                <input type="text" id="supplier-gstin" class="form-control form-control-mono" maxlength="15" placeholder="27AABCU9603R1ZN">
               </div>
             </div>
 
@@ -160,7 +172,11 @@
               <div class="form-group">
                 <label class="form-label" for="recipient-gstin">
                   <span>Recipient GSTIN</span>
-                  <span id="recipient-gstin-badge"></span>
+                  <span style="display: flex; align-items: center; gap: 6px;">
+                    <span id="recipient-gstin-badge"></span>
+                    <button type="button" id="btn-lookup-recipient" class="btn btn-secondary btn-sm" style="padding: 1px 7px; font-size: 0.7rem;">🔍 Live Lookup</button>
+                    <a id="link-official-recipient" href="https://services.gst.gov.in/services/searchtp" target="_blank" rel="noopener noreferrer" style="font-size: 0.7rem; color: var(--cyan); text-decoration: none;" title="Verify on official GST portal">Portal ↗</a>
+                  </span>
                 </label>
                 <input type="text" id="recipient-gstin" class="form-control form-control-mono" maxlength="15" placeholder="Buyer GSTIN (or blank)">
               </div>
@@ -380,8 +396,91 @@
     </div>
   </div>
 
-  <!-- Core Scripts -->
+  <!-- Live Taxpayer Verification Modal -->
+  <div id="taxpayer-modal" class="modal-overlay">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3 style="font-size: 1.1rem; font-weight: 700;">🔍 Live GSTN Taxpayer Verification</h3>
+        <button id="taxpayer-modal-close" class="btn-icon" style="border: none; cursor: pointer;">✕</button>
+      </div>
+      <div id="taxpayer-modal-body"></div>
+    </div>
+  </div>
+
+  <!-- E-Invoice QR Code Scanner Modal -->
+  <div id="qr-modal" class="modal-overlay">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3 style="font-size: 1.1rem; font-weight: 700;">📷 Decode Official NIC E-Invoice QR Code</h3>
+        <button id="qr-modal-close" class="btn-icon" style="border: none; cursor: pointer;">✕</button>
+      </div>
+      <div style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 16px;">
+        Upload a scanned B2B invoice QR code image or paste the signed JWT payload under GST Rule 48(4).
+      </div>
+      
+      <div class="dropzone" id="qr-dropzone" style="padding: 20px; margin-bottom: 14px;">
+        <svg class="dropzone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="3" width="7" height="7"/>
+          <rect x="14" y="3" width="7" height="7"/>
+          <rect x="14" y="14" width="7" height="7"/>
+          <rect x="3" y="14" width="7" height="7"/>
+        </svg>
+        <div class="dropzone-text" style="font-size: 0.88rem;">Drop QR Code Image Here</div>
+        <div class="dropzone-sub">or click to browse PNG, JPG</div>
+        <input type="file" id="qr-file-input" accept="image/*" style="display: none;">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="qr-jwt-paste">Or Paste Signed JWT Token / Raw QR Payload:</label>
+        <textarea id="qr-jwt-paste" class="form-control form-control-mono" style="height: 90px; font-size: 0.76rem;" placeholder="eyJhbGciOiJSUzI1NiJ9..."></textarea>
+      </div>
+
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 14px;">
+        <button type="button" id="btn-load-sample-qr" class="btn btn-secondary btn-sm">⚡ Load Sample E-Invoice QR</button>
+        <button type="button" id="btn-decode-qr" class="btn btn-primary btn-sm">Decode & Ingest into Audit</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- API Gateway Configuration Modal -->
+  <div id="api-modal" class="modal-overlay">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3 style="font-size: 1.1rem; font-weight: 700;">🌐 GSTN Live API Gateway Settings</h3>
+        <button id="api-modal-close" class="btn-icon" style="border: none; cursor: pointer;">✕</button>
+      </div>
+      <div style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 16px;">
+        Connect to live Indian GST taxpayer databases. You can use your own GSP/ASP developer token or test using the verified sandbox gateway.
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="api-provider-select">API Provider:</label>
+        <select id="api-provider-select" class="form-control">
+          <option value="sandbox">Sandbox.co.in (GSTIN Taxpayer Public API)</option>
+          <option value="cashfree">Cashfree Verification Suite</option>
+          <option value="mastersindia">MastersIndia GSP Gateway</option>
+          <option value="custom">Custom REST Endpoint</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="api-key-input">API Secret / Bearer Token:</label>
+        <input type="password" id="api-key-input" class="form-control form-control-mono" placeholder="Paste live API key (stored in local browser)">
+        <span class="form-hint">Leaves browser memory unshared · 100% Zero-Knowledge</span>
+      </div>
+
+      <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px;">
+        <button type="button" id="btn-save-api-key" class="btn btn-primary btn-sm">Save & Enable Live API</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- jsQR Library for Real Client-Side QR Decoding -->
+  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+
+  <!-- Core Engine Scripts -->
   <script src="js/gstRules.js"></script>
+  <script src="js/apiConnector.js"></script>
   <script src="js/validator.js"></script>
   <script src="js/sampleData.js"></script>
   <script src="js/export.js"></script>
