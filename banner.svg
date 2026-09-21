@@ -1,0 +1,96 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 280" width="100%" height="280" fill="none">
+  <defs>
+    <linearGradient id="bgGrad" x1="0" y1="0" x2="960" y2="280" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#0b1320"/>
+      <stop offset="50%" stop-color="#11223b"/>
+      <stop offset="100%" stop-color="#0b1728"/>
+    </linearGradient>
+    <linearGradient id="primaryAccent" x1="0" y1="0" x2="200" y2="0" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#10b981"/>
+      <stop offset="100%" stop-color="#06b6d4"/>
+    </linearGradient>
+    <linearGradient id="cardGrad" x1="0" y1="0" x2="0" y2="120" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#1e293b" stop-opacity="0.8"/>
+      <stop offset="100%" stop-color="#0f172a" stop-opacity="0.9"/>
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="12" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
+  </defs>
+
+  <!-- Background Canvas with Subtle Grid Pattern -->
+  <rect width="960" height="280" rx="14" fill="url(#bgGrad)"/>
+  
+  <g opacity="0.07" stroke="#94a3b8" stroke-width="1">
+    <line x1="0" y1="40" x2="960" y2="40"/>
+    <line x1="0" y1="80" x2="960" y2="80"/>
+    <line x1="0" y1="120" x2="960" y2="120"/>
+    <line x1="0" y1="160" x2="960" y2="160"/>
+    <line x1="0" y1="200" x2="960" y2="200"/>
+    <line x1="0" y1="240" x2="960" y2="240"/>
+    <line x1="80" y1="0" x2="80" y2="280"/>
+    <line x1="200" y1="0" x2="200" y2="280"/>
+    <line x1="320" y1="0" x2="320" y2="280"/>
+    <line x1="440" y1="0" x2="440" y2="280"/>
+    <line x1="560" y1="0" x2="560" y2="280"/>
+    <line x1="680" y1="0" x2="680" y2="280"/>
+    <line x1="800" y1="0" x2="800" y2="280"/>
+    <line x1="920" y1="0" x2="920" y2="280"/>
+  </g>
+
+  <!-- Ambient Glow circles -->
+  <circle cx="120" cy="140" r="100" fill="#10b981" opacity="0.12" filter="url(#glow)"/>
+  <circle cx="860" cy="90" r="120" fill="#06b6d4" opacity="0.10" filter="url(#glow)"/>
+
+  <!-- Left Side: Icon Shield Badge -->
+  <g transform="translate(48, 50)">
+    <!-- Outer Shield -->
+    <path d="M48 6L15 18V42C15 66 29 82 48 90C67 82 81 66 81 42V18L48 6Z" fill="url(#primaryAccent)"/>
+    <path d="M48 12L21 22V42C21 62 33 76 48 83C63 76 75 62 75 42V22L48 12Z" fill="#0b1320"/>
+    <path d="M35 48L44 57L62 36" stroke="#10b981" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+
+  <!-- Brand Headers -->
+  <g transform="translate(160, 68)">
+    <rect x="0" y="0" width="190" height="24" rx="12" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+    <circle cx="12" cy="12" r="4" fill="#10b981"/>
+    <text x="24" y="16" fill="#10b981" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" font-weight="700" letter-spacing="1">STATUTORY TAX ENGINE</text>
+
+    <text x="0" y="54" fill="#f8fafc" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="30" font-weight="800" letter-spacing="-0.5">Automated GST &amp; Invoice Validator</text>
+    <text x="0" y="80" fill="#94a3b8" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="14" font-weight="400">
+      Enterprise Client-Side Tax Auditor · Modulo 36 Luhn Algorithm · Section 16(2) ITC Assurance
+    </text>
+    
+    <!-- Feature tags row -->
+    <g transform="translate(0, 105)">
+      <rect x="0" y="0" width="112" height="26" rx="6" fill="#0f172a" stroke="#10b981" stroke-opacity="0.4"/>
+      <text x="10" y="17" fill="#6ee7b7" font-family="monospace" font-size="11" font-weight="600">✓ 10-Pass Audit</text>
+
+      <rect x="122" y="0" width="138" height="26" rx="6" fill="#0f172a" stroke="#06b6d4" stroke-opacity="0.4"/>
+      <text x="132" y="17" fill="#67e8f9" font-family="monospace" font-size="11" font-weight="600">⚡ Zero-Knowledge</text>
+
+      <rect x="270" y="0" width="128" height="26" rx="6" fill="#0f172a" stroke="#f59e0b" stroke-opacity="0.4"/>
+      <text x="280" y="17" fill="#fcd34d" font-family="monospace" font-size="11" font-weight="600">🛡️ Rule 46 Valid</text>
+    </g>
+  </g>
+
+  <!-- Right Side: Tech & Business KPI Display Cards -->
+  <g transform="translate(680, 42)">
+    <!-- Card 1: Checksum & Math Precision -->
+    <rect x="0" y="0" width="230" height="90" rx="10" fill="url(#cardGrad)" stroke="#334155" stroke-width="1.2"/>
+    <text x="16" y="24" fill="#94a3b8" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" font-weight="600" text-transform="uppercase" letter-spacing="0.5">ALGORITHM RIGOR</text>
+    <text x="16" y="52" fill="#38bdf8" font-family="monospace" font-size="20" font-weight="800">Mod-36 Luhn</text>
+    <text x="16" y="74" fill="#64748b" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11">15-Digit GSTN Checksum Verification</text>
+    <circle cx="206" cy="22" r="6" fill="#10b981"/>
+
+    <!-- Card 2: Section 16(2) ITC Shield -->
+    <g transform="translate(0, 104)">
+      <rect x="0" y="0" width="230" height="90" rx="10" fill="url(#cardGrad)" stroke="#334155" stroke-width="1.2"/>
+      <text x="16" y="24" fill="#94a3b8" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" font-weight="600" text-transform="uppercase" letter-spacing="0.5">BUSINESS ASSURANCE</text>
+      <text x="16" y="52" fill="#10b981" font-family="monospace" font-size="20" font-weight="800">100% ITC Eligible</text>
+      <text x="16" y="74" fill="#64748b" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11">Eliminates GSTR-2B Tax Credit Loss</text>
+      <circle cx="206" cy="22" r="6" fill="#38bdf8"/>
+    </g>
+  </g>
+</svg>
