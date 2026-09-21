@@ -780,3 +780,237 @@
   color: var(--text-body);
 }
 
+/* Privacy Badge in Header */
+.privacy-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #ffffff;
+  border: 1px solid var(--border-medium);
+  border-left: 3px solid var(--emerald-green);
+  padding: 3px 10px;
+  border-radius: var(--radius-xs);
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+/* Amount in Words Box */
+.amount-in-words-box {
+  background: var(--bg-surface-elevated);
+  border: 1px dashed var(--border-medium);
+  border-radius: var(--radius-xs);
+  padding: 8px 12px;
+  margin-top: 8px;
+  font-size: 0.82rem;
+  color: var(--text-navy);
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Multi-Dimensional Audit Score Breakdown */
+.score-breakdown-box {
+  margin-top: 14px;
+  background: #ffffff;
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+}
+
+.score-breakdown-title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--text-navy);
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.score-bar-row {
+  margin-bottom: 8px;
+}
+
+.score-bar-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-bottom: 3px;
+}
+
+.score-bar-track {
+  width: 100%;
+  height: 6px;
+  background: var(--bg-surface-elevated);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.score-bar-fill {
+  height: 100%;
+  background: var(--primary-navy);
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+.score-bar-fill.pass { background: var(--emerald-green); }
+.score-bar-fill.warn { background: var(--amber-gold); }
+.score-bar-fill.fail { background: var(--rose-red); }
+
+/* GSTR-2B vs Books 2-Way Matcher Desk */
+.recon-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.recon-buckets-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
+}
+
+.recon-bucket-card {
+  background: #ffffff;
+  border: 1px solid var(--border-medium);
+  border-top: 4px solid var(--primary-navy);
+  border-radius: var(--radius-sm);
+  padding: 14px 16px;
+  box-shadow: var(--shadow-xs);
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.recon-bucket-card:hover,
+.recon-bucket-card.active {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+}
+
+.recon-bucket-card.match { border-top-color: var(--emerald-green); }
+.recon-bucket-card.variance { border-top-color: var(--amber-gold); }
+.recon-bucket-card.missing-2b { border-top-color: var(--rose-red); }
+.recon-bucket-card.missing-books { border-top-color: var(--info-blue); }
+
+.recon-bucket-title {
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+.recon-bucket-count {
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: var(--text-navy);
+  margin: 4px 0;
+}
+
+.recon-bucket-amount {
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: var(--text-body);
+}
+
+/* CA Tools & Calculators Grid */
+.ca-tools-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+  gap: 18px;
+}
+
+.ca-tool-card {
+  background: #ffffff;
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-md);
+  padding: 20px;
+  box-shadow: var(--shadow-xs);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.ca-tool-header {
+  border-bottom: 1px solid var(--border-subtle);
+  padding-bottom: 8px;
+}
+
+.ca-tool-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--text-navy);
+}
+
+.ca-calc-output {
+  background: var(--bg-surface-elevated);
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-xs);
+  padding: 12px 14px;
+  margin-top: 10px;
+}
+
+.ca-calc-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.85rem;
+  margin-bottom: 6px;
+}
+
+.ca-calc-row:last-child {
+  margin-bottom: 0;
+  padding-top: 6px;
+  border-top: 1px dashed var(--border-medium);
+  font-weight: 700;
+}
+
+/* Dynamic UPI QR Code Display */
+.upi-qr-box {
+  text-align: center;
+  padding: 16px;
+  background: var(--bg-surface-elevated);
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-sm);
+  margin-bottom: 16px;
+}
+
+.upi-qr-image-wrapper {
+  display: inline-block;
+  padding: 12px;
+  background: #ffffff;
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-xs);
+  margin-bottom: 10px;
+}
+
+/* Keyboard Shortcuts Modal Table */
+.shortcuts-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.84rem;
+}
+
+.shortcuts-table td {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.kbd-badge {
+  display: inline-block;
+  padding: 2px 7px;
+  font-family: monospace;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--text-navy);
+  background: var(--bg-surface-elevated);
+  border: 1px solid var(--border-medium);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+}
+
+

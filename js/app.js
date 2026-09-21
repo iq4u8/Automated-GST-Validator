@@ -28,6 +28,13 @@ document.addEventListener("DOMContentLoaded", () => {
   initLiveLookupHandlers();
   initEInvoiceQRHandlers();
   initApiSettingsHandlers();
+  initUPIQRModal();
+  initExportNICJSON();
+  initExportTallyXML();
+  initKeyboardShortcuts();
+  initReconciliationTab();
+  initToolsTab();
+  initBulkAutoFix();
 
   // Load Preset 1 by default
   loadScenarioById("preset_1");
@@ -92,6 +99,12 @@ document.addEventListener("DOMContentLoaded", () => {
       renderScenariosGrid();
     } else if (tabId === "history") {
       renderAuditHistory();
+    } else if (tabId === "recon") {
+      if (!AppState.reconResults) loadSampleReconData();
+    } else if (tabId === "tools") {
+      recalcInterestTool();
+      recalcReverseGST();
+      recalcEWayBill();
     }
   }
 
@@ -740,11 +753,57 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Update Section 16(2) ITC Checklist
     updateITCChecklist(audit);
+
+    // Update Amount in Words (Mandatory Legal Clause)
+    const wordsEl = document.getElementById("amount-in-words-text");
+    if (wordsEl) {
+      wordsEl.textContent = GSTRules.numberToIndianWords(AppState.activeInvoice.totalAmount || 0);
+    }
+
+    // Update Financial Period
+    const periodEl = document.getElementById("period-badge");
+    if (periodEl && audit.calculated && audit.calculated.financialPeriod) {
+      periodEl.textContent = `${audit.calculated.financialPeriod.financialYear} · ${audit.calculated.financialPeriod.quarter}`;
+    }
+
+    // Update Multi-Dimensional Sub-Scores
+    if (audit.scores) {
+      const gstinBar = document.getElementById("subscore-gstin-bar");
+      const gstinTxt = document.getElementById("subscore-gstin-text");
+      if (gstinBar && gstinTxt) {
+        gstinTxt.textContent = `${audit.scores.gstin}%`;
+        gstinBar.style.width = `${audit.scores.gstin}%`;
+        gstinBar.className = `score-bar-fill ${audit.scores.gstin >= 90 ? 'pass' : (audit.scores.gstin >= 60 ? 'warn' : 'fail')}`;
+      }
+
+      const posBar = document.getElementById("subscore-pos-bar");
+      const posTxt = document.getElementById("subscore-pos-text");
+      if (posBar && posTxt) {
+        posTxt.textContent = `${audit.scores.pos}%`;
+        posBar.style.width = `${audit.scores.pos}%`;
+        posBar.className = `score-bar-fill ${audit.scores.pos >= 90 ? 'pass' : (audit.scores.pos >= 60 ? 'warn' : 'fail')}`;
+      }
+
+      const mathBar = document.getElementById("subscore-math-bar");
+      const mathTxt = document.getElementById("subscore-math-text");
+      if (mathBar && mathTxt) {
+        mathTxt.textContent = `${audit.scores.math}%`;
+        mathBar.style.width = `${audit.scores.math}%`;
+        mathBar.className = `score-bar-fill ${audit.scores.math >= 90 ? 'pass' : (audit.scores.math >= 60 ? 'warn' : 'fail')}`;
+      }
+
+      const statBar = document.getElementById("subscore-statutory-bar");
+      const statTxt = document.getElementById("subscore-statutory-text");
+      if (statBar && statTxt) {
+        statTxt.textContent = `${audit.scores.statutory}%`;
+        statBar.style.width = `${audit.scores.statutory}%`;
+        statBar.className = `score-bar-fill ${audit.scores.statutory >= 90 ? 'pass' : (audit.scores.statutory >= 60 ? 'warn' : 'fail')}`;
+      }
+    }
   }
 
   function updateITCChecklist(audit) {
     const sGstin = document.getElementById("supplier-gstin").value.trim();
-    const rGstin = document.getElementById("recipient-gstin").value.trim();
     const sCheck = GSTRules.verifyGSTINChecksum(sGstin);
     const hasCritical = audit.violations.some(v => v.severity === "CRITICAL");
 
@@ -778,7 +837,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (chkMath) {
       const hasMathError = audit.violations.some(v => v.ruleId && (v.ruleId.includes("MATH") || v.ruleId.includes("TAXABLE") || v.ruleId.includes("TAX_AMOUNT")));
       chkMath.innerHTML = !hasMathError
-        ? `<span>✅</span> Line item rates & subtotal verified`
+        ? `<span>✅</span> Line item rates &amp; subtotal verified`
         : `<span>❌</span> Subtotal calculation discrepancy`;
     }
 
@@ -788,6 +847,14 @@ document.addEventListener("DOMContentLoaded", () => {
       chkRule46.innerHTML = !hasInvNumError
         ? `<span>✅</span> Invoice number complies with Rule 46`
         : `<span>❌</span> Rule 46 non-compliant invoice number/date`;
+    }
+
+    const chkSec17 = document.getElementById("itc-chk-sec17");
+    if (chkSec17) {
+      const hasSec17 = audit.violations.some(v => v.ruleId && v.ruleId.includes("SECTION_17_5"));
+      chkSec17.innerHTML = !hasSec17
+        ? `<span>✅</span> Cleared Section 17(5) blocked credit restrictions`
+        : `<span>⚠️</span> Warning: Potential restricted items under Section 17(5)`;
     }
   }
 
@@ -1303,6 +1370,512 @@ document.addEventListener("DOMContentLoaded", () => {
         showToast(`API Gateway configured: ${provider.toUpperCase()}`, "success");
       });
     }
+  }
+
+  // --- DYNAMIC B2C UPI PAYMENT QR CONTROLLER ---
+  function initUPIQRModal() {
+    const openBtn = document.getElementById("btn-open-upi-qr");
+    const modal = document.getElementById("upi-qr-modal");
+    const closeBtn = document.getElementById("upi-qr-modal-close");
+    const qrImg = document.getElementById("upi-qr-image");
+    const amtText = document.getElementById("upi-qr-amount-text");
+    const vpaText = document.getElementById("upi-qr-vpa-text");
+    const vpaInput = document.getElementById("upi-merchant-vpa");
+    const refreshBtn = document.getElementById("btn-refresh-upi-qr");
+    const copyUriBtn = document.getElementById("btn-copy-upi-uri");
+
+    function renderQR() {
+      if (!AppState.activeInvoice) return;
+      const vpa = (vpaInput && vpaInput.value.trim()) || "accounts@icici";
+      const amt = Number(AppState.activeInvoice.totalAmount || 0);
+      const invNo = AppState.activeInvoice.invoiceNumber || "INV-001";
+      const uri = GSTRules.generateUPIPaymentURI({
+        vpa,
+        name: AppState.activeInvoice.supplierName || "Merchant Accounts",
+        amount: amt,
+        invoiceNo: invNo,
+        note: `Tax Invoice ${invNo}`
+      });
+
+      if (amtText) amtText.textContent = `₹${amt.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`;
+      if (vpaText) vpaText.textContent = vpa;
+      if (qrImg) qrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(uri)}`;
+      AppState.currentUPIUri = uri;
+    }
+
+    if (openBtn && modal) {
+      openBtn.addEventListener("click", () => {
+        renderQR();
+        modal.classList.add("open");
+      });
+    }
+
+    if (closeBtn && modal) {
+      closeBtn.addEventListener("click", () => modal.classList.remove("open"));
+    }
+
+    if (refreshBtn) {
+      refreshBtn.addEventListener("click", () => {
+        renderQR();
+        showToast("Dynamic UPI payment QR regenerated.", "info");
+      });
+    }
+
+    if (copyUriBtn) {
+      copyUriBtn.addEventListener("click", () => {
+        if (AppState.currentUPIUri) {
+          navigator.clipboard.writeText(AppState.currentUPIUri).then(() => {
+            showToast("UPI Intent URI copied to clipboard!", "success");
+          });
+        }
+      });
+    }
+  }
+
+  // --- NIC E-INVOICE JSON SCHEMA (V1.03) EXPORTER ---
+  function initExportNICJSON() {
+    const btn = document.getElementById("btn-export-nic-json");
+    if (!btn) return;
+
+    btn.addEventListener("click", () => {
+      if (!AppState.activeInvoice) {
+        showToast("No active invoice to export.", "warning");
+        return;
+      }
+      try {
+        const payload = GSTRules.generateEInvoiceJSON(AppState.activeInvoice);
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(payload, null, 2));
+        const a = document.createElement("a");
+        const invNo = (AppState.activeInvoice.invoiceNumber || "EINV").replace(/[^a-zA-Z0-9]/g, "_");
+        a.href = dataStr;
+        a.download = `EInvoice_${invNo}_v1.03.json`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        showToast(`Exported official NIC E-Invoice JSON Schema v1.03!`, "success");
+      } catch (err) {
+        showToast("Export error: " + err.message, "error");
+      }
+    });
+  }
+
+  // --- TALLY PRIME / ERP 9 XML EXPORTER ---
+  function initExportTallyXML() {
+    const btn = document.getElementById("btn-export-tally-xml");
+    if (!btn) return;
+
+    btn.addEventListener("click", () => {
+      if (!AppState.activeInvoice) {
+        showToast("No active invoice to export.", "warning");
+        return;
+      }
+      try {
+        const xml = GSTRules.generateTallyXML(AppState.activeInvoice);
+        const dataStr = "data:text/xml;charset=utf-8," + encodeURIComponent(xml);
+        const a = document.createElement("a");
+        const invNo = (AppState.activeInvoice.invoiceNumber || "VOUCHER").replace(/[^a-zA-Z0-9]/g, "_");
+        a.href = dataStr;
+        a.download = `TallyVoucher_${invNo}.xml`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        showToast(`Exported Tally DayBook XML Voucher!`, "success");
+      } catch (err) {
+        showToast("Export error: " + err.message, "error");
+      }
+    });
+  }
+
+  // --- PRO KEYBOARD SHORTCUTS CONTROLLER ---
+  function initKeyboardShortcuts() {
+    const shortcutsBtn = document.getElementById("btn-shortcuts");
+    const shortcutsModal = document.getElementById("shortcuts-modal");
+    const closeBtn = document.getElementById("shortcuts-modal-close");
+    const gotItBtn = document.getElementById("btn-shortcuts-close");
+
+    if (shortcutsBtn && shortcutsModal) {
+      shortcutsBtn.addEventListener("click", () => shortcutsModal.classList.add("open"));
+    }
+    const close = () => shortcutsModal && shortcutsModal.classList.remove("open");
+    if (closeBtn) closeBtn.addEventListener("click", close);
+    if (gotItBtn) gotItBtn.addEventListener("click", close);
+
+    window.addEventListener("keydown", (e) => {
+      // Ignore if user is typing in a textarea or input (except for global Ctrl combos)
+      const isInput = ["INPUT", "TEXTAREA", "SELECT"].includes(e.target.tagName);
+
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "n") {
+        e.preventDefault();
+        createNewBlankInvoice();
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
+        e.preventDefault();
+        saveCurrentAuditToHistory();
+      } else if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === "f") {
+        e.preventDefault();
+        const autoFixBtn = document.getElementById("btn-autofix");
+        if (autoFixBtn && autoFixBtn.style.display !== "none") {
+          autoFixBtn.click();
+        }
+      } else if (e.altKey && e.key.toLowerCase() === "a") {
+        e.preventDefault();
+        const addRowBtn = document.getElementById("btn-add-item");
+        if (addRowBtn) addRowBtn.click();
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "p" && !isInput) {
+        e.preventDefault();
+        const printBtn = document.getElementById("btn-print-slip");
+        if (printBtn) printBtn.click();
+      } else if (e.key === "Escape") {
+        document.querySelectorAll(".modal-overlay.open").forEach(m => m.classList.remove("open"));
+      }
+    });
+  }
+
+  // --- GSTR-2B VS PURCHASE REGISTER 2-WAY RECONCILIATION MATCHING DESK ---
+  function initReconciliationTab() {
+    const sampleBtn = document.getElementById("btn-load-sample-recon");
+    const runBtn = document.getElementById("btn-run-recon");
+    const vendorEmailBtn = document.getElementById("btn-vendor-email");
+    const exportCsvBtn = document.getElementById("btn-export-recon-csv");
+
+    if (sampleBtn) sampleBtn.addEventListener("click", loadSampleReconData);
+    if (runBtn) runBtn.addEventListener("click", runReconciliation);
+
+    if (vendorEmailBtn) {
+      vendorEmailBtn.addEventListener("click", () => {
+        const missing = (AppState.reconResults || []).filter(r => r.status === "MISSING_IN_2B");
+        if (missing.length === 0) {
+          showToast("No delinquent vendors missing in GSTR-2B!", "success");
+          return;
+        }
+        const sampleVendor = missing[0];
+        const draft = `Subject: URGENT: Non-reflection of Invoice ${sampleVendor.invNo} in GSTR-2B (ITC Blocked under Section 16(2)(aa))\n\n` +
+          `Dear ${sampleVendor.vendorName},\n\n` +
+          `Our monthly statutory audit indicates that Invoice #${sampleVendor.invNo} dated ${sampleVendor.invDate} for ₹${sampleVendor.booksTotal.toLocaleString("en-IN")} ` +
+          `(GST: ₹${sampleVendor.booksTax.toLocaleString("en-IN")}) has NOT been reflected in our auto-drafted GSTR-2B statement.\n\n` +
+          `As per Section 16(2)(aa) of the CGST Act, 2017, we are statutorily barred from availing Input Tax Credit until you file your GSTR-1 return and report this invoice.\n\n` +
+          `Kindly confirm whether this invoice has been uploaded to the GST Portal or rectify it in your upcoming return period.\n\n` +
+          `Regards,\nTax & Accounts Department`;
+
+        navigator.clipboard.writeText(draft).then(() => {
+          alert(`Formal Notice Copied to Clipboard:\n\n` + draft);
+        });
+      });
+    }
+
+    if (exportCsvBtn) {
+      exportCsvBtn.addEventListener("click", () => {
+        if (!AppState.reconResults || AppState.reconResults.length === 0) {
+          showToast("No reconciliation data to export.", "warning");
+          return;
+        }
+        const headers = ["Vendor GSTIN", "Vendor Name", "Invoice No", "Date", "Books Taxable", "2B Taxable", "Books Tax", "2B Tax", "Variance", "Status"];
+        const rows = AppState.reconResults.map(r => [
+          r.gstin, `"${r.vendorName}"`, `"${r.invNo}"`, r.invDate,
+          r.booksTaxable, r.portalTaxable, r.booksTax, r.portalTax, r.variance, r.status
+        ]);
+        const csvContent = "data:text/csv;charset=utf-8," + [headers.join(","), ...rows.map(e => e.join(","))].join("\n");
+        const a = document.createElement("a");
+        a.href = encodeURI(csvContent);
+        a.download = `GSTR2B_Reconciliation_${new Date().toISOString().slice(0, 10)}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        showToast("Exported 2-Way Reconciliation Statement (CSV)!", "success");
+      });
+    }
+
+    // Filter bucket card clicks
+    document.querySelectorAll(".recon-bucket-card").forEach(card => {
+      card.addEventListener("click", () => {
+        document.querySelectorAll(".recon-bucket-card").forEach(c => c.classList.remove("active"));
+        card.classList.add("active");
+        const bucket = card.getAttribute("data-recon-bucket");
+        renderReconciliationTable(bucket);
+      });
+    });
+  }
+
+  function loadSampleReconData() {
+    // 5 Enterprise Purchase Register Vouchers (Buyer's Books)
+    AppState.reconBooks = [
+      { gstin: "27AABCU9603R1ZN", vendorName: "Tata Consultancy Services Ltd", invNo: "TCS/2026/8821", invDate: "2026-09-05", taxable: 100000.0, tax: 18000.0, total: 118000.0 },
+      { gstin: "29AAACG2170D1ZZ", vendorName: "Infosys BPM India Pvt Ltd", invNo: "INF/2026/4401", invDate: "2026-09-08", taxable: 250000.0, tax: 45000.0, total: 295000.0 },
+      { gstin: "24AAACG1234F1ZA", vendorName: "Reliance Logistics Cargo", invNo: "RL/2026/9012", invDate: "2026-09-12", taxable: 45000.0, tax: 8100.0, total: 53100.0 },
+      { gstin: "23AAACS1429B1Z3", vendorName: "Satna Machinery & Tools Corp", invNo: "SMT/2026/1140", invDate: "2026-09-14", taxable: 80000.0, tax: 14400.0, total: 94400.0 }
+    ];
+
+    // 5 Invoices Extracted from Official GSTR-2B Tax Portal
+    AppState.reconGSTR2B = [
+      { gstin: "27AABCU9603R1ZN", vendorName: "Tata Consultancy Services Ltd", invNo: "TCS/2026/8821", invDate: "2026-09-05", taxable: 100000.0, tax: 18000.0, total: 118000.0 },
+      { gstin: "29AAACG2170D1ZZ", vendorName: "Infosys BPM India Pvt Ltd", invNo: "INF/2026/4401", invDate: "2026-09-08", taxable: 250000.0, tax: 45000.0, total: 295000.0 },
+      { gstin: "24AAACG1234F1ZA", vendorName: "Reliance Logistics Cargo", invNo: "RL/2026/9012", invDate: "2026-09-12", taxable: 45200.0, tax: 8136.0, total: 53336.0 }, // Small variance
+      { gstin: "27AAACL3301G1Z8", vendorName: "Larsen & Toubro Infra Solutions", invNo: "LT/2026/3301", invDate: "2026-09-16", taxable: 120000.0, tax: 21600.0, total: 141600.0 } // In 2B but missing in books!
+    ];
+
+    runReconciliation();
+    showToast("Loaded sample Purchase Books and GSTR-2B portal data!", "info");
+  }
+
+  function runReconciliation() {
+    if (!AppState.reconBooks || !AppState.reconGSTR2B) {
+      loadSampleReconData();
+      return;
+    }
+
+    const results = [];
+    const matched2BIndexes = new Set();
+
+    // Loop through Buyer's Books
+    AppState.reconBooks.forEach(bookItem => {
+      const normBookNo = bookItem.invNo.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
+      const pIdx = AppState.reconGSTR2B.findIndex((p, idx) => {
+        if (matched2BIndexes.has(idx)) return false;
+        const normPNo = p.invNo.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
+        return normBookNo === normPNo && p.gstin.toUpperCase() === bookItem.gstin.toUpperCase();
+      });
+
+      if (pIdx !== -1) {
+        matched2BIndexes.add(pIdx);
+        const pItem = AppState.reconGSTR2B[pIdx];
+        const taxDiff = Math.abs(bookItem.tax - pItem.tax);
+        const isExact = taxDiff <= 5.00;
+
+        results.push({
+          gstin: bookItem.gstin,
+          vendorName: bookItem.vendorName,
+          invNo: bookItem.invNo,
+          invDate: bookItem.invDate,
+          booksTaxable: bookItem.taxable,
+          portalTaxable: pItem.taxable,
+          booksTax: bookItem.tax,
+          portalTax: pItem.tax,
+          booksTotal: bookItem.total,
+          variance: Math.round((bookItem.tax - pItem.tax) * 100) / 100,
+          status: isExact ? "MATCHED" : "VARIANCE"
+        });
+      } else {
+        // Missing in GSTR-2B!
+        results.push({
+          gstin: bookItem.gstin,
+          vendorName: bookItem.vendorName,
+          invNo: bookItem.invNo,
+          invDate: bookItem.invDate,
+          booksTaxable: bookItem.taxable,
+          portalTaxable: 0,
+          booksTax: bookItem.tax,
+          portalTax: 0,
+          booksTotal: bookItem.total,
+          variance: bookItem.tax,
+          status: "MISSING_IN_2B"
+        });
+      }
+    });
+
+    // Unrecorded invoices in GSTR-2B
+    AppState.reconGSTR2B.forEach((pItem, idx) => {
+      if (!matched2BIndexes.has(idx)) {
+        results.push({
+          gstin: pItem.gstin,
+          vendorName: pItem.vendorName,
+          invNo: pItem.invNo,
+          invDate: pItem.invDate,
+          booksTaxable: 0,
+          portalTaxable: pItem.taxable,
+          booksTax: 0,
+          portalTax: pItem.tax,
+          booksTotal: pItem.total,
+          variance: -pItem.tax,
+          status: "MISSING_IN_BOOKS"
+        });
+      }
+    });
+
+    AppState.reconResults = results;
+
+    // Update Buckets KPI Cards
+    const matchedList = results.filter(r => r.status === "MATCHED");
+    const varianceList = results.filter(r => r.status === "VARIANCE");
+    const missing2bList = results.filter(r => r.status === "MISSING_IN_2B");
+    const missingBooksList = results.filter(r => r.status === "MISSING_IN_BOOKS");
+
+    document.getElementById("recon-count-matched").textContent = matchedList.length;
+    document.getElementById("recon-amt-matched").textContent = `₹${matchedList.reduce((acc, r) => acc + r.booksTax, 0).toLocaleString("en-IN")} ITC Eligible`;
+
+    document.getElementById("recon-count-variance").textContent = varianceList.length;
+    document.getElementById("recon-amt-variance").textContent = `±₹${varianceList.reduce((acc, r) => acc + Math.abs(r.variance), 0).toLocaleString("en-IN")} Variance`;
+
+    document.getElementById("recon-count-missing-2b").textContent = missing2bList.length;
+    document.getElementById("recon-amt-missing-2b").textContent = `₹${missing2bList.reduce((acc, r) => acc + r.booksTax, 0).toLocaleString("en-IN")} Blocked`;
+
+    document.getElementById("recon-count-missing-books").textContent = missingBooksList.length;
+    document.getElementById("recon-amt-missing-books").textContent = `₹${missingBooksList.reduce((acc, r) => acc + r.portalTax, 0).toLocaleString("en-IN")} Unrecorded`;
+
+    renderReconciliationTable("all");
+  }
+
+  function renderReconciliationTable(filter = "all") {
+    const tbody = document.getElementById("recon-data-tbody");
+    const badge = document.getElementById("recon-table-badge");
+    const title = document.getElementById("recon-table-title");
+    if (!tbody || !AppState.reconResults) return;
+
+    let list = AppState.reconResults;
+    if (filter === "matched") list = list.filter(r => r.status === "MATCHED");
+    else if (filter === "variance") list = list.filter(r => r.status === "VARIANCE");
+    else if (filter === "missing_2b") list = list.filter(r => r.status === "MISSING_IN_2B");
+    else if (filter === "missing_books") list = list.filter(r => r.status === "MISSING_IN_BOOKS");
+
+    if (badge) badge.textContent = `${list.length} Record${list.length === 1 ? '' : 's'}`;
+    if (title) {
+      title.textContent = filter === "all" ? "All Reconciled Items" : `Filtered Items: ${filter.replace(/_/g, " ").toUpperCase()}`;
+    }
+
+    if (list.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="10" style="text-align: center; padding: 24px; color: var(--text-muted);">No records found matching this bucket filter.</td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = list.map(r => {
+      let badgeClass = "badge-pass";
+      let statusLabel = "MATCHED (Claim ITC)";
+      if (r.status === "VARIANCE") {
+        badgeClass = "badge-warn";
+        statusLabel = "RATE VARIANCE";
+      } else if (r.status === "MISSING_IN_2B") {
+        badgeClass = "badge-fail";
+        statusLabel = "NOT IN 2B (Blocked)";
+      } else if (r.status === "MISSING_IN_BOOKS") {
+        badgeClass = "badge-info";
+        statusLabel = "UNRECORDED";
+      }
+
+      return `
+        <tr>
+          <td><span style="font-family: monospace; font-size: 0.8rem;">${r.gstin}</span></td>
+          <td><strong>${r.vendorName}</strong></td>
+          <td>${r.invNo}</td>
+          <td>${r.invDate}</td>
+          <td>₹${r.booksTaxable.toLocaleString("en-IN")}</td>
+          <td>₹${r.portalTaxable.toLocaleString("en-IN")}</td>
+          <td>₹${r.booksTax.toLocaleString("en-IN")}</td>
+          <td>₹${r.portalTax.toLocaleString("en-IN")}</td>
+          <td style="color: ${r.variance !== 0 ? 'var(--rose-red)' : 'var(--text-muted)'}; font-weight: 600;">
+            ${r.variance > 0 ? '+' : ''}₹${r.variance.toFixed(2)}
+          </td>
+          <td><span class="badge ${badgeClass}">${statusLabel}</span></td>
+        </tr>
+      `;
+    }).join("");
+  }
+
+  // --- CA TOOLS & STATUTORY CALCULATORS TAB ---
+  function initToolsTab() {
+    const intTax = document.getElementById("calc-tax-principal");
+    const intType = document.getElementById("calc-interest-type");
+    const intDue = document.getElementById("calc-due-date");
+    const intPay = document.getElementById("calc-payment-date");
+    const intBtn = document.getElementById("btn-recalc-interest");
+
+    [intTax, intType, intDue, intPay].forEach(el => {
+      if (el) el.addEventListener("input", recalcInterestTool);
+    });
+    if (intBtn) intBtn.addEventListener("click", recalcInterestTool);
+
+    const revGross = document.getElementById("calc-gross-mrp");
+    const revRate = document.getElementById("calc-slab-rate");
+    const revBtn = document.getElementById("btn-recalc-reverse");
+
+    [revGross, revRate].forEach(el => {
+      if (el) el.addEventListener("input", recalcReverseGST);
+    });
+    if (revBtn) revBtn.addEventListener("click", recalcReverseGST);
+
+    const ewbDist = document.getElementById("calc-ewb-distance");
+    const ewbCargo = document.getElementById("calc-cargo-type");
+    const ewbBtn = document.getElementById("btn-recalc-ewb");
+
+    [ewbDist, ewbCargo].forEach(el => {
+      if (el) el.addEventListener("input", recalcEWayBill);
+    });
+    if (ewbBtn) ewbBtn.addEventListener("click", recalcEWayBill);
+  }
+
+  function recalcInterestTool() {
+    const tax = Number(document.getElementById("calc-tax-principal").value) || 0;
+    const isExcess = document.getElementById("calc-interest-type").value === "24";
+    const dueDate = document.getElementById("calc-due-date").value;
+    const payDate = document.getElementById("calc-payment-date").value;
+
+    const res = GSTRules.calculateSection50Interest(tax, dueDate, payDate, isExcess);
+
+    document.getElementById("calc-res-days").textContent = `${res.daysDelayed} Days`;
+    document.getElementById("calc-res-rate").textContent = `${res.interestRate}% per annum (${res.ruleReference})`;
+    document.getElementById("calc-res-interest").textContent = `₹${res.interestAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`;
+    document.getElementById("calc-res-total").textContent = `₹${res.totalDue.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`;
+  }
+
+  function recalcReverseGST() {
+    const gross = Number(document.getElementById("calc-gross-mrp").value) || 0;
+    const rate = Number(document.getElementById("calc-slab-rate").value) || 18;
+
+    const net = Math.round((gross / (1 + rate / 100)) * 100) / 100;
+    const gst = Math.round((gross - net) * 100) / 100;
+    const half = Math.round((gst / 2) * 100) / 100;
+
+    document.getElementById("calc-res-net").textContent = `₹${net.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`;
+    document.getElementById("calc-res-gst").textContent = `₹${gst.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`;
+    document.getElementById("calc-res-split").textContent = `CGST: ₹${half.toLocaleString("en-IN", { minimumFractionDigits: 2 })} | SGST: ₹${half.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`;
+    document.getElementById("calc-res-gross").textContent = `₹${gross.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`;
+  }
+
+  function recalcEWayBill() {
+    const dist = Number(document.getElementById("calc-ewb-distance").value) || 0;
+    const cargo = document.getElementById("calc-cargo-type").value;
+    const speed = cargo === "over_dimensional" ? 20 : 200;
+    const days = Math.max(1, Math.ceil(dist / speed));
+
+    document.getElementById("calc-ewb-speed").textContent = `${speed} KM per day`;
+    document.getElementById("calc-ewb-days").textContent = `${days} Day${days === 1 ? '' : 's'}`;
+    document.getElementById("calc-ewb-expiry").textContent = `Midnight of ${days}${days === 1 ? 'st' : (days === 2 ? 'nd' : (days === 3 ? 'rd' : 'th'))} Day`;
+  }
+
+  // --- BATCH AUTO-FIX IN BULK REGISTER ---
+  function initBulkAutoFix() {
+    const btn = document.getElementById("btn-bulk-autofix");
+    if (!btn) return;
+
+    btn.addEventListener("click", () => {
+      if (!AppState.bulkAudits || AppState.bulkAudits.length === 0) {
+        showToast("Please load or paste bulk invoices first.", "warning");
+        return;
+      }
+
+      let fixedCount = 0;
+      AppState.bulkAudits.forEach(item => {
+        const inv = item.invoice;
+        const pos = inv.placeOfSupply ? inv.placeOfSupply.substring(0, 2) : "27";
+        const supp = inv.supplierGstin ? inv.supplierGstin.substring(0, 2) : "27";
+        const isIntra = (supp === pos);
+        const totTax = (Number(inv.cgst || 0) + Number(inv.sgst || 0) + Number(inv.igst || 0));
+
+        if (isIntra) {
+          inv.cgst = Math.round((totTax / 2) * 100) / 100;
+          inv.sgst = Math.round((totTax / 2) * 100) / 100;
+          inv.igst = 0;
+        } else {
+          inv.cgst = 0;
+          inv.sgst = 0;
+          inv.igst = totTax;
+        }
+
+        // Re-audit row
+        item.audit = GSTValidator.auditInvoice(inv);
+        fixedCount++;
+      });
+
+      renderBulkTable();
+      showToast(`Batch Auto-Fix Applied: Aligned taxes across ${fixedCount} invoices!`, "success");
+    });
   }
 
   // --- TOAST ALERTS ---

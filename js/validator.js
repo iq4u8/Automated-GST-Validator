@@ -396,8 +396,9 @@ const GSTValidator = (() => {
         ruleId: "R10_RCM_NOTIFICATION",
         severity: "WARNING",
         title: "Reverse Charge (RCM) Applicable",
-        desc: "Tax on this invoice is payable directly by the recipient to the government. Seller will not collect tax on bill.",
-        autoFixable: false
+        desc: "Tax on this invoice is payable directly by the recipient to the government. Seller must not collect tax on bill under Section 9(3)/9(4).",
+        autoFixable: true,
+        fixType: "RCM_SUPPRESS_TAX"
       });
     }
 
@@ -421,8 +422,118 @@ const GSTValidator = (() => {
       }
     }
 
+    // --- RULE 11: Mandatory E-Way Bill Threshold (Rule 138 CGST Rules) ---
+    const ewayCheck = GSTRules.evaluateEWayBillRequirement(standardRoundedTotal, posEval.isIntraState, supplierStateCode);
+    if (ewayCheck.required && !invoice.ewayBillNo) {
+      violations.push({
+        ruleId: "R11_EWAY_BILL_MANDATORY",
+        severity: "WARNING",
+        title: "E-Way Bill Generation Required (Rule 138)",
+        desc: ewayCheck.message,
+        fixHint: "Generate E-Way Bill on ewaybillgst.gov.in and record 12-digit EWB Number.",
+        autoFixable: false
+      });
+      score -= 5;
+    } else if (invoice.ewayBillNo) {
+      const cleanEwb = String(invoice.ewayBillNo).trim();
+      if (/^[0-9]{12}$/.test(cleanEwb)) {
+        passes.push({
+          ruleId: "R11_EWAY_BILL_PASS",
+          title: "Valid E-Way Bill Number Recorded",
+          desc: `EWB No: ${cleanEwb} verified for consignment movement.`
+        });
+      } else {
+        violations.push({
+          ruleId: "R11_EWAY_BILL_INVALID",
+          severity: "WARNING",
+          title: "Invalid E-Way Bill Number Format",
+          desc: `Recorded EWB No '${cleanEwb}' must be a 12-digit numeric identifier issued by NIC E-Way Bill Portal.`,
+          autoFixable: false
+        });
+        score -= 5;
+      }
+    }
+
+    // --- RULE 12: Embedded PAN Entity Structure Validation ---
+    if (supplierGstin && supplierGstin.length === 15) {
+      const panCheck = GSTRules.validateGSTINPAN(supplierGstin);
+      if (!panCheck.isValid) {
+        violations.push({
+          ruleId: "R12_SUPPLIER_PAN_CORRUPT",
+          severity: "CRITICAL",
+          title: "Supplier PAN Entity Inconsistency",
+          desc: `4th character '${panCheck.entityChar}' in PAN '${panCheck.pan}' is not an authorized Indian Income Tax entity code.`,
+          autoFixable: false
+        });
+        score -= 15;
+      } else {
+        passes.push({
+          ruleId: "R12_SUPPLIER_PAN_PASS",
+          title: `Supplier Entity Verified: ${panCheck.entityType}`,
+          desc: `PAN ${panCheck.pan} verified as ${panCheck.entityType}.`
+        });
+      }
+    }
+
+    // --- RULE 13: Section 17(5) Blocked ITC Detection ---
+    const blockedItemsFound = [];
+    lineItems.forEach((it, idx) => {
+      const blk = GSTRules.checkBlockedITCKeyword(it.description);
+      if (blk) {
+        blockedItemsFound.push({ itemNo: idx + 1, desc: it.description, keyword: blk.keyword });
+      }
+    });
+
+    if (blockedItemsFound.length > 0 && invoiceType === "B2B") {
+      violations.push({
+        ruleId: "R13_SECTION_17_5_BLOCKED_ITC",
+        severity: "WARNING",
+        title: "Potential Blocked ITC under Section 17(5)",
+        desc: `Item(s) [${blockedItemsFound.map(b => `#${b.itemNo}: '${b.desc}'`).join(", ")}] appear to fall under restricted ITC categories (motor vehicles, food/catering, club memberships). Ensure credit is not claimed in GSTR-3B Table 4(B).`,
+        autoFixable: false
+      });
+      score -= 5;
+    } else if (invoiceType === "B2B") {
+      passes.push({
+        ruleId: "R13_SECTION_17_5_PASS",
+        title: "Section 17(5) Restrictions Cleared",
+        desc: "No restricted items (motor vehicles, catering, personal consumption) detected in line descriptions."
+      });
+    }
+
+    // --- RULE 14: 180-Day Rule for ITC Payment (Rule 37 CGST Rules) ---
+    if (invoiceDate && invoiceType === "B2B") {
+      const invTime = new Date(invoiceDate).getTime();
+      const nowTime = new Date().getTime();
+      const daysElapsed = Math.floor((nowTime - invTime) / (1000 * 60 * 60 * 24));
+      if (daysElapsed > 180 && !invoice.isPaid) {
+        violations.push({
+          ruleId: "R14_180_DAY_RULE_BREACH",
+          severity: "WARNING",
+          title: "180-Day Rule Alert: Mandatory ITC Reversal (Rule 37)",
+          desc: `Invoice date is ${daysElapsed} days old. Under the 2nd proviso to Section 16(2), if payment is not made to supplier within 180 days, ITC must be reversed with 18% interest under Rule 37.`,
+          autoFixable: false
+        });
+        score -= 10;
+      }
+    }
+
+    // Multi-Dimensional Score Breakdown
+    const gstinViolations = violations.filter(v => v.ruleId.startsWith("R1_") || v.ruleId.startsWith("R2_") || v.ruleId.startsWith("R12_"));
+    const posViolations = violations.filter(v => v.ruleId.startsWith("R3_") || v.ruleId.startsWith("R4_"));
+    const mathViolations = violations.filter(v => v.ruleId.startsWith("R5_") || v.ruleId.startsWith("R6_") || v.ruleId.startsWith("R7_"));
+    const statutoryViolations = violations.filter(v => v.ruleId.startsWith("R8_") || v.ruleId.startsWith("R9_") || v.ruleId.startsWith("R10_") || v.ruleId.startsWith("R11_") || v.ruleId.startsWith("R13_") || v.ruleId.startsWith("R14_"));
+
+    const scores = {
+      overall: Math.max(0, Math.min(100, Math.round(score))),
+      gstin: Math.max(0, 100 - gstinViolations.reduce((acc, v) => acc + (v.severity === "CRITICAL" ? 30 : 15), 0)),
+      pos: Math.max(0, 100 - posViolations.reduce((acc, v) => acc + (v.severity === "CRITICAL" ? 35 : 15), 0)),
+      math: Math.max(0, 100 - mathViolations.reduce((acc, v) => acc + (v.severity === "CRITICAL" ? 25 : 10), 0)),
+      statutory: Math.max(0, 100 - statutoryViolations.reduce((acc, v) => acc + (v.severity === "CRITICAL" ? 20 : 10), 0))
+    };
+
     // Normalized Score
-    score = Math.max(0, Math.min(100, Math.round(score)));
+    score = scores.overall;
     let status = "PASS";
     if (violations.some(v => v.severity === "CRITICAL")) {
       status = "FAILED";
@@ -433,6 +544,7 @@ const GSTValidator = (() => {
     return {
       score,
       status,
+      scores,
       violations,
       passes,
       calculated: {
@@ -444,7 +556,9 @@ const GSTValidator = (() => {
         computedRoundOff,
         standardRoundedTotal,
         totalDeclaredTax,
-        totalComputedTax
+        totalComputedTax,
+        ewayCheck,
+        financialPeriod: GSTRules.getFinancialPeriod(invoiceDate)
       }
     };
   }
@@ -492,6 +606,15 @@ const GSTValidator = (() => {
     // 5. Align RoundOff & Grand Total
     fixed.roundOff = calc.computedRoundOff;
     fixed.totalAmount = calc.standardRoundedTotal;
+
+    // 6. If RCM is enabled, seller cannot collect tax on bill (tax is paid directly by recipient)
+    if (fixed.isRcm) {
+      fixed.cgst = 0;
+      fixed.sgst = 0;
+      fixed.igst = 0;
+      fixed.totalAmount = fixed.taxableAmount;
+      fixed.roundOff = 0;
+    }
 
     return fixed;
   }

@@ -40,8 +40,15 @@
       </div>
 
       <div class="header-actions">
+        <!-- Privacy Badge -->
+        <span class="privacy-pill" title="All processing occurs in browser memory. No data is sent to external servers.">
+          🔒 Zero-Knowledge Privacy
+        </span>
+        <button id="btn-shortcuts" class="btn btn-secondary btn-sm" title="View keyboard shortcuts (Ctrl+?)">
+          ⌨️ Shortcuts
+        </button>
         <!-- Main Workstation Action Buttons -->
-        <button id="btn-header-new" class="btn btn-primary btn-sm" title="Start a new blank invoice audit">
+        <button id="btn-header-new" class="btn btn-primary btn-sm" title="Start a new blank invoice audit (Ctrl+N)">
           + New Invoice
         </button>
         <button id="btn-header-upload" class="btn btn-secondary btn-sm" title="Upload and parse your invoice JSON or CSV">
@@ -63,7 +70,7 @@
       <div class="kpi-card emerald">
         <div class="form-label" style="margin-bottom: 2px;">Audit Status <span class="badge badge-pass">Pass</span></div>
         <div id="kpi-compliance-rate" style="font-size: 1.65rem; font-weight: 800; color: var(--text-main); margin: 4px 0;">100% Pass</div>
-        <div class="form-hint">All 10 GST rules matched</div>
+        <div class="form-hint">All 14 GST rules checked</div>
       </div>
 
       <div class="kpi-card cyan">
@@ -91,7 +98,7 @@
       </div>
     </section>
 
-    <!-- Navigation Tabs (Clean separation between Workstation, Bulk, Test Suite & History) -->
+    <!-- Navigation Tabs (6 Dedicated Workspaces) -->
     <nav class="tabs-nav">
       <button class="tab-btn active" data-tab="inspector">
         <span>📄</span> Invoice Auditor Workstation
@@ -99,11 +106,17 @@
       <button class="tab-btn" data-tab="bulk">
         <span>📊</span> Bulk CSV / Sales Register
       </button>
+      <button class="tab-btn" data-tab="recon">
+        <span>🔄</span> GSTR-2B 2-Way Matcher <span class="badge badge-warn" style="font-size: 0.72rem; padding: 2px 7px;">Smart ITC</span>
+      </button>
       <button class="tab-btn" data-tab="scenarios">
         <span>🧪</span> Test Scenarios & Case Studies <span class="badge badge-info" style="font-size: 0.72rem; padding: 2px 7px;">5 Cases</span>
       </button>
       <button class="tab-btn" data-tab="history">
         <span>📁</span> Audit History <span id="history-badge-count" class="badge badge-pass" style="font-size: 0.72rem; padding: 2px 7px;">0</span>
+      </button>
+      <button class="tab-btn" data-tab="tools">
+        <span>🧮</span> CA Tools & Calculators
       </button>
     </nav>
 
@@ -119,50 +132,67 @@
               <span id="supply-nature-badge" class="badge badge-info">INTRA-STATE (CGST + SGST)</span>
             </h2>
             <div class="panel-toolbar">
-              <button type="button" id="btn-new-invoice" class="btn btn-secondary btn-sm" title="Reset form to enter a new invoice">
+              <button type="button" id="btn-new-invoice" class="btn btn-secondary btn-sm" title="Reset form to enter a new invoice (Ctrl+N)">
                 + New / Clear
               </button>
               <button type="button" id="btn-upload-file" class="btn btn-secondary btn-sm" title="Upload invoice file (JSON / CSV)">
                 📂 Upload File
               </button>
-              <button type="button" id="btn-save-audit" class="btn btn-secondary btn-sm" title="Save this audit record into local history">
+              <button type="button" id="btn-save-audit" class="btn btn-secondary btn-sm" title="Save this audit record into local history (Ctrl+S)">
                 💾 Save Audit
               </button>
-              <button type="button" id="btn-autofix" class="btn-autofix" style="display: none;">
+              <button type="button" id="btn-autofix" class="btn-autofix" style="display: none;" title="1-Click Auto-Fix statutory discrepancies (Ctrl+Shift+F)">
                 ⚡ Fix Taxes Automatically
               </button>
-              <button type="button" id="btn-print-slip" class="btn btn-secondary btn-sm">
-                🖨️ Print Audit Summary
+              <button type="button" id="btn-open-upi-qr" class="btn btn-secondary btn-sm" title="Generate statutory Dynamic UPI Payment QR code">
+                📱 UPI QR
+              </button>
+              <button type="button" id="btn-export-nic-json" class="btn btn-secondary btn-sm" title="Download official NIC E-Invoice JSON Schema v1.03">
+                🧾 NIC JSON
+              </button>
+              <button type="button" id="btn-export-tally-xml" class="btn btn-secondary btn-sm" title="Export voucher in Tally Prime / ERP 9 XML format">
+                📑 Tally XML
+              </button>
+              <button type="button" id="btn-print-slip" class="btn btn-secondary btn-sm" title="Print compliance certificate (Ctrl+P)">
+                🖨️ Print Summary
               </button>
             </div>
           </div>
 
           <form id="inspector-form" onsubmit="return false;">
-            <!-- Row 1: Invoice Meta (3 equal columns) -->
-            <div class="form-grid-3">
+            <!-- Row 1: Invoice Meta (4 equal columns) -->
+            <div class="form-grid-4">
               <div class="form-group">
                 <label class="form-label" for="inv-number">Invoice Number</label>
                 <input type="text" id="inv-number" class="form-control" placeholder="e.g. INV/2026/0842">
                 <div class="form-field-footer">
-                  <span class="form-hint">Up to 16 characters (Rule 46)</span>
+                  <span class="form-hint">Max 16 chars (Rule 46)</span>
                 </div>
               </div>
               <div class="form-group">
                 <label class="form-label" for="inv-date">Invoice Date</label>
                 <input type="date" id="inv-date" class="form-control">
                 <div class="form-field-footer">
-                  <span class="form-hint">Bill issue date</span>
+                  <span id="period-badge" class="form-hint">FY 2025-26</span>
                 </div>
               </div>
               <div class="form-group">
                 <label class="form-label" for="inv-type">Supply Category</label>
                 <select id="inv-type" class="form-control">
-                  <option value="B2B">B2B (Registered Business)</option>
+                  <option value="B2B">B2B (Registered Regular)</option>
                   <option value="B2C">B2C (Retail Consumer)</option>
-                  <option value="EXPORT">Export / SEZ Supply</option>
+                  <option value="SEZ">SEZ Supply (Zero-Rated)</option>
+                  <option value="DEEMED_EXPORT">Deemed Export</option>
                 </select>
                 <div class="form-field-footer">
                   <span class="form-hint">Tax classification</span>
+                </div>
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="inv-eway-bill">E-Way Bill (Rule 138)</label>
+                <input type="text" id="inv-eway-bill" class="form-control form-control-mono" maxlength="12" placeholder="12-digit EWB No">
+                <div class="form-field-footer">
+                  <span class="form-hint">Required if &gt; ₹50k</span>
                 </div>
               </div>
             </div>
@@ -221,21 +251,24 @@
             <!-- Line Items Table -->
             <div class="line-items-container">
               <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                <label class="form-label" style="font-weight: 700; margin: 0;">Line Items & GST Rates</label>
-                <button type="button" id="btn-add-item" class="btn btn-secondary btn-sm">+ Add Item Row</button>
+                <label class="form-label" style="font-weight: 700; margin: 0;">Line Items &amp; GST Rates</label>
+                <div style="display: flex; gap: 8px;">
+                  <button type="button" id="btn-add-item" class="btn btn-secondary btn-sm">+ Add Item Row (Alt+A)</button>
+                </div>
               </div>
 
               <div style="overflow-x: auto;">
                 <table class="line-items-table">
                   <thead>
                     <tr>
-                      <th style="min-width: 180px;">Item Description</th>
-                      <th style="width: 100px;">HSN / SAC</th>
-                      <th style="width: 65px;">Qty</th>
-                      <th style="width: 105px;">Rate (₹)</th>
-                      <th style="width: 95px;">Discount (₹)</th>
-                      <th style="width: 95px;">GST Slab</th>
-                      <th style="width: 35px;"></th>
+                      <th style="min-width: 170px;">Item Description</th>
+                      <th style="width: 95px;">HSN / SAC</th>
+                      <th style="width: 60px;">Qty</th>
+                      <th style="width: 100px;">Rate (₹)</th>
+                      <th style="width: 90px;">Discount (₹)</th>
+                      <th style="width: 90px;">GST Slab</th>
+                      <th style="width: 120px;">ITC Category</th>
+                      <th style="width: 65px; text-align: center;">Action</th>
                     </tr>
                   </thead>
                   <tbody id="line-items-tbody"></tbody>
@@ -279,10 +312,25 @@
                 </div>
               </div>
 
-              <div style="margin-top: 10px; display: flex; align-items: center; gap: 8px;">
-                <input type="checkbox" id="is-rcm">
-                <label for="is-rcm" style="font-size: 0.85rem; color: var(--text-body); cursor: pointer;">
-                  Tax is payable under Reverse Charge Mechanism (RCM)
+              <!-- Statutory Amount in Words Display (Mandatory Legal Clause) -->
+              <div id="amount-in-words-box" class="amount-in-words-box">
+                <span style="font-size: 1rem;">🔤</span>
+                <span id="amount-in-words-text">INR One Lakh Seventy-Seven Thousand Only</span>
+              </div>
+
+              <!-- Legal Provisions Checkboxes -->
+              <div style="margin-top: 12px; display: flex; flex-wrap: wrap; gap: 16px; padding-top: 8px; border-top: 1px solid var(--border-subtle);">
+                <label style="font-size: 0.82rem; color: var(--text-body); cursor: pointer; display: flex; align-items: center; gap: 6px;">
+                  <input type="checkbox" id="is-rcm">
+                  <span>Reverse Charge Mechanism (RCM) under Sec 9(3)/9(4)</span>
+                </label>
+                <label style="font-size: 0.82rem; color: var(--text-body); cursor: pointer; display: flex; align-items: center; gap: 6px;">
+                  <input type="checkbox" id="is-sez">
+                  <span>SEZ Supply under LUT without payment of IGST</span>
+                </label>
+                <label style="font-size: 0.82rem; color: var(--text-body); cursor: pointer; display: flex; align-items: center; gap: 6px;">
+                  <input type="checkbox" id="is-paid-180" checked>
+                  <span>Vendor Payment Settled within 180 Days (Rule 37)</span>
                 </label>
               </div>
             </div>
@@ -292,7 +340,7 @@
         <!-- Right Panel: Verification Findings -->
         <aside class="panel">
           <div class="panel-header">
-            <h2 class="panel-title">Verification & Audit Report</h2>
+            <h2 class="panel-title">Verification &amp; Audit Report</h2>
           </div>
 
           <!-- Gauge Score Box -->
@@ -304,6 +352,47 @@
             <div class="score-details">
               <h4 id="audit-status-text">All Checks Passed</h4>
               <p id="audit-status-desc">This invoice complies with Indian GST rules and calculations match.</p>
+            </div>
+          </div>
+
+          <!-- Multi-Dimensional Score Breakdown -->
+          <div class="score-breakdown-box">
+            <div class="score-breakdown-title">Compliance Sub-Scores</div>
+            <div class="score-bar-row">
+              <div class="score-bar-label">
+                <span>GSTIN &amp; PAN Checksum</span>
+                <span id="subscore-gstin-text">100%</span>
+              </div>
+              <div class="score-bar-track">
+                <div id="subscore-gstin-bar" class="score-bar-fill pass" style="width: 100%;"></div>
+              </div>
+            </div>
+            <div class="score-bar-row">
+              <div class="score-bar-label">
+                <span>Place of Supply &amp; Taxes</span>
+                <span id="subscore-pos-text">100%</span>
+              </div>
+              <div class="score-bar-track">
+                <div id="subscore-pos-bar" class="score-bar-fill pass" style="width: 100%;"></div>
+              </div>
+            </div>
+            <div class="score-bar-row">
+              <div class="score-bar-label">
+                <span>Item Math &amp; Round-Off</span>
+                <span id="subscore-math-text">100%</span>
+              </div>
+              <div class="score-bar-track">
+                <div id="subscore-math-bar" class="score-bar-fill pass" style="width: 100%;"></div>
+              </div>
+            </div>
+            <div class="score-bar-row">
+              <div class="score-bar-label">
+                <span>Rule 46 &amp; Statutory Limits</span>
+                <span id="subscore-statutory-text">100%</span>
+              </div>
+              <div class="score-bar-track">
+                <div id="subscore-statutory-bar" class="score-bar-fill pass" style="width: 100%;"></div>
+              </div>
             </div>
           </div>
 
@@ -324,10 +413,13 @@
                 <span>✅</span> Place of Supply (POS) matches tax split (CGST+SGST vs IGST)
               </li>
               <li class="itc-check-item" id="itc-chk-math">
-                <span>✅</span> Line item rates & subtotal calculation verified
+                <span>✅</span> Line item rates &amp; subtotal calculation verified
               </li>
               <li class="itc-check-item" id="itc-chk-rule46">
                 <span>✅</span> Invoice number complies with Rule 46 16-character limit
+              </li>
+              <li class="itc-check-item" id="itc-chk-sec17">
+                <span>✅</span> Cleared Section 17(5) blocked credit restrictions
               </li>
             </ul>
           </div>
@@ -375,7 +467,10 @@
               <button class="filter-pill-btn" data-filter="warning">⚠️ Warnings Only</button>
               <button class="filter-pill-btn" data-filter="pass">✓ Clean Passes Only</button>
             </div>
-            <div>
+            <div style="display: flex; gap: 8px;">
+              <button id="btn-bulk-autofix" class="btn btn-secondary btn-sm" title="Automatically resolve POS tax splits across all bulk invoices">
+                ⚡ Auto-Fix All Tax Splits
+              </button>
               <button id="btn-export-csv" class="btn btn-secondary btn-sm">📥 Export Findings (CSV)</button>
             </div>
           </div>
@@ -409,13 +504,111 @@
       </div>
     </main>
 
-    <!-- TAB 3: DEDICATED AUDIT TEST SCENARIOS & CASE STUDIES -->
+    <!-- TAB 3: GSTR-2B VS PURCHASE REGISTER 2-WAY RECONCILIATION MATCHING DESK -->
+    <main id="tab-recon" class="tab-content">
+      <div class="recon-layout">
+        <!-- Recon Header Card -->
+        <div class="panel" style="padding: 16px 20px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+            <div>
+              <h2 style="font-size: 1.25rem; font-weight: 800; color: var(--text-navy); margin: 0;">
+                GSTR-2B vs Purchase Register 2-Way ITC Matcher
+              </h2>
+              <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 4px;">
+                Reconcile purchase books against official GSTR-2B tax portal data to claim 100% legitimate ITC and block supplier default risks under Section 16(2)(aa).
+              </p>
+            </div>
+            <div style="display: flex; gap: 8px;">
+              <button type="button" id="btn-load-sample-recon" class="btn btn-secondary btn-sm">
+                ⚡ Load Sample 2B &amp; Books
+              </button>
+              <button type="button" id="btn-run-recon" class="btn btn-primary btn-sm">
+                🔄 Run Auto-Reconciliation
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 4 Buckets KPI Cards -->
+        <div class="recon-buckets-grid">
+          <div class="recon-bucket-card match active" data-recon-bucket="matched">
+            <div class="recon-bucket-title">✓ Matched Invoices</div>
+            <div id="recon-count-matched" class="recon-bucket-count">0</div>
+            <div id="recon-amt-matched" class="recon-bucket-amount" style="color: var(--emerald-green);">₹0.00 ITC Eligible</div>
+          </div>
+
+          <div class="recon-bucket-card variance" data-recon-bucket="variance">
+            <div class="recon-bucket-title">⚠️ Tax/Value Variance</div>
+            <div id="recon-count-variance" class="recon-bucket-count">0</div>
+            <div id="recon-amt-variance" class="recon-bucket-amount" style="color: var(--amber-gold);">±₹0.00 Difference</div>
+          </div>
+
+          <div class="recon-bucket-card missing-2b" data-recon-bucket="missing_2b">
+            <div class="recon-bucket-title">⛔ Missing in GSTR-2B</div>
+            <div id="recon-count-missing-2b" class="recon-bucket-count">0</div>
+            <div id="recon-amt-missing-2b" class="recon-bucket-amount" style="color: var(--rose-red);">₹0.00 ITC Blocked</div>
+          </div>
+
+          <div class="recon-bucket-card missing-books" data-recon-bucket="missing_books">
+            <div class="recon-bucket-title">ℹ️ Missing in Books</div>
+            <div id="recon-count-missing-books" class="recon-bucket-count">0</div>
+            <div id="recon-amt-missing-books" class="recon-bucket-amount" style="color: var(--info-blue);">₹0.00 Unrecorded</div>
+          </div>
+        </div>
+
+        <!-- Recon Data Table Panel -->
+        <div class="panel">
+          <div class="panel-header">
+            <h3 class="panel-title">
+              <span id="recon-table-title">Reconciliation Results: All Items</span>
+              <span id="recon-table-badge" class="badge badge-info">0 Records</span>
+            </h3>
+            <div style="display: flex; gap: 8px;">
+              <button type="button" id="btn-vendor-email" class="btn btn-secondary btn-sm" title="Generate notification email draft for missing invoices">
+                ✉️ Vendor Follow-Up Email
+              </button>
+              <button type="button" id="btn-export-recon-csv" class="btn btn-secondary btn-sm">
+                📥 Export Recon (CSV)
+              </button>
+            </div>
+          </div>
+
+          <div class="data-table-wrapper">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Vendor GSTIN</th>
+                  <th>Vendor Name</th>
+                  <th>Invoice No</th>
+                  <th>Invoice Date</th>
+                  <th>Books Taxable (₹)</th>
+                  <th>GSTR-2B Taxable (₹)</th>
+                  <th>Books Tax (₹)</th>
+                  <th>GSTR-2B Tax (₹)</th>
+                  <th>Variance (₹)</th>
+                  <th>ITC Status</th>
+                </tr>
+              </thead>
+              <tbody id="recon-data-tbody">
+                <tr>
+                  <td colspan="10" style="text-align: center; padding: 24px; color: var(--text-muted);">
+                    No reconciliation performed yet. Click <strong>"⚡ Load Sample 2B &amp; Books"</strong> and press <strong>"🔄 Run Auto-Reconciliation"</strong>.
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- TAB 4: DEDICATED AUDIT TEST SCENARIOS & CASE STUDIES -->
     <main id="tab-scenarios" class="tab-content">
       <div class="scenarios-panel">
         <div class="scenarios-header">
           <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
             <div>
-              <h2 style="font-size: 1.25rem; font-weight: 800; color: var(--text-navy);">Statutory Audit Test Cases & Benchmarks</h2>
+              <h2 style="font-size: 1.25rem; font-weight: 800; color: var(--text-navy);">Statutory Audit Test Cases &amp; Benchmarks</h2>
               <p style="font-size: 0.875rem; color: var(--text-muted); margin-top: 3px;">
                 Dedicated benchmark suite demonstrating statutory GST rules: Place of Supply conflicts, Modulo 36 Luhn checksum, discount drift, and high-value consumer thresholds.
               </p>
@@ -430,7 +623,7 @@
       </div>
     </main>
 
-    <!-- TAB 4: SAVED AUDITS HISTORY -->
+    <!-- TAB 5: SAVED AUDITS HISTORY -->
     <main id="tab-history" class="tab-content">
       <div class="panel">
         <div class="panel-header">
@@ -470,6 +663,164 @@
               </tr>
             </tbody>
           </table>
+        </div>
+      </div>
+    </main>
+
+    <!-- TAB 6: CA TOOLS & STATUTORY CALCULATORS -->
+    <main id="tab-tools" class="tab-content">
+      <div class="ca-tools-grid">
+        <!-- Tool 1: Section 50 Interest & Penalty Calculator -->
+        <div class="ca-tool-card">
+          <div class="ca-tool-header">
+            <h3 class="ca-tool-title">⚖️ Section 50 Late Payment Interest Calculator</h3>
+            <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 2px;">
+              Computes statutory interest under Section 50(1) (18% p.a. on net tax liability) &amp; Section 50(3) (24% p.a. on wrongful ITC).
+            </p>
+          </div>
+          <div>
+            <div class="form-grid-2">
+              <div class="form-group">
+                <label class="form-label" for="calc-tax-principal">Delayed Tax Liability (₹)</label>
+                <input type="number" id="calc-tax-principal" class="form-control" value="50000" step="100">
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="calc-interest-type">Interest Provision</label>
+                <select id="calc-interest-type" class="form-control">
+                  <option value="18">Section 50(1): 18% p.a. (Delayed Tax)</option>
+                  <option value="24">Section 50(3): 24% p.a. (Undue Excess ITC)</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-grid-2">
+              <div class="form-group">
+                <label class="form-label" for="calc-due-date">Statutory Due Date (20th)</label>
+                <input type="date" id="calc-due-date" class="form-control" value="2026-08-20">
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="calc-payment-date">Actual Date of Payment</label>
+                <input type="date" id="calc-payment-date" class="form-control" value="2026-09-21">
+              </div>
+            </div>
+
+            <div class="ca-calc-output">
+              <div class="ca-calc-row">
+                <span>Days Delayed:</span>
+                <span id="calc-res-days" style="font-weight: 700;">32 Days</span>
+              </div>
+              <div class="ca-calc-row">
+                <span>Interest Rate:</span>
+                <span id="calc-res-rate">18% per annum</span>
+              </div>
+              <div class="ca-calc-row">
+                <span>Calculated Interest:</span>
+                <span id="calc-res-interest" style="color: var(--rose-red); font-weight: 700;">₹789.04</span>
+              </div>
+              <div class="ca-calc-row">
+                <span>Total Amount Payable:</span>
+                <span id="calc-res-total" style="color: var(--primary-navy);">₹50,789.04</span>
+              </div>
+            </div>
+          </div>
+          <button type="button" id="btn-recalc-interest" class="btn btn-secondary btn-sm" style="align-self: flex-end;">
+            Recalculate Interest
+          </button>
+        </div>
+
+        <!-- Tool 2: Reverse Tax & Base Price Calculator -->
+        <div class="ca-tool-card">
+          <div class="ca-tool-header">
+            <h3 class="ca-tool-title">🧮 Reverse GST Slicing Calculator</h3>
+            <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 2px;">
+              Derive exact base taxable value and tax fractions from any gross tax-inclusive retail price (MRP).
+            </p>
+          </div>
+          <div>
+            <div class="form-grid-2">
+              <div class="form-group">
+                <label class="form-label" for="calc-gross-mrp">Gross Inclusive Price (₹)</label>
+                <input type="number" id="calc-gross-mrp" class="form-control" value="11800" step="10">
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="calc-slab-rate">Applicable GST Slab</label>
+                <select id="calc-slab-rate" class="form-control">
+                  <option value="5">5% (Essential Goods)</option>
+                  <option value="12">12% (Standard I)</option>
+                  <option value="18" selected>18% (Standard II / Services)</option>
+                  <option value="28">28% (Luxury / De-merit)</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="ca-calc-output">
+              <div class="ca-calc-row">
+                <span>Net Taxable Value:</span>
+                <span id="calc-res-net" style="font-weight: 700;">₹10,000.00</span>
+              </div>
+              <div class="ca-calc-row">
+                <span>Total GST Component:</span>
+                <span id="calc-res-gst" style="color: var(--accent-gold); font-weight: 700;">₹1,800.00</span>
+              </div>
+              <div class="ca-calc-row">
+                <span>If Intra-State (CGST + SGST):</span>
+                <span id="calc-res-split">CGST: ₹900.00 | SGST: ₹900.00</span>
+              </div>
+              <div class="ca-calc-row">
+                <span>Gross Verified Price:</span>
+                <span id="calc-res-gross" style="color: var(--primary-navy);">₹11,800.00</span>
+              </div>
+            </div>
+          </div>
+          <button type="button" id="btn-recalc-reverse" class="btn btn-secondary btn-sm" style="align-self: flex-end;">
+            Recalculate Base
+          </button>
+        </div>
+
+        <!-- Tool 3: Rule 138(10) E-Way Bill Validity Estimator -->
+        <div class="ca-tool-card">
+          <div class="ca-tool-header">
+            <h3 class="ca-tool-title">🚚 Rule 138(10) E-Way Bill Validity Estimator</h3>
+            <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 2px;">
+              Calculate statutory transit validity in days based on consignment transit distance and cargo dimension.
+            </p>
+          </div>
+          <div>
+            <div class="form-grid-2">
+              <div class="form-group">
+                <label class="form-label" for="calc-ewb-distance">Transit Distance (KM)</label>
+                <input type="number" id="calc-ewb-distance" class="form-control" value="650" step="10">
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="calc-cargo-type">Consignment Cargo Type</label>
+                <select id="calc-cargo-type" class="form-control">
+                  <option value="normal">Normal Cargo (1 Day / 200 KM)</option>
+                  <option value="over_dimensional">Over-Dimensional Cargo (1 Day / 20 KM)</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="ca-calc-output">
+              <div class="ca-calc-row">
+                <span>Statutory Speed Standard:</span>
+                <span id="calc-ewb-speed">200 KM per day</span>
+              </div>
+              <div class="ca-calc-row">
+                <span>Total Allowed Transit Days:</span>
+                <span id="calc-ewb-days" style="color: var(--primary-navy); font-weight: 700;">4 Days</span>
+              </div>
+              <div class="ca-calc-row">
+                <span>Validity Expiry:</span>
+                <span id="calc-ewb-expiry">Midnight of 4th Day</span>
+              </div>
+              <div class="ca-calc-row">
+                <span>Consignment Status:</span>
+                <span style="color: var(--emerald-green); font-weight: 700;">Valid for Dispatch</span>
+              </div>
+            </div>
+          </div>
+          <button type="button" id="btn-recalc-ewb" class="btn btn-secondary btn-sm" style="align-self: flex-end;">
+            Recalculate Validity
+          </button>
         </div>
       </div>
     </main>
@@ -573,6 +924,87 @@
 
       <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px;">
         <button type="button" id="btn-save-api-key" class="btn btn-primary btn-sm">Save Settings</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Dynamic UPI Payment QR Modal -->
+  <div id="upi-qr-modal" class="modal-overlay">
+    <div class="modal-box" style="max-width: 480px;">
+      <div class="modal-header">
+        <h3 style="font-size: 1.05rem; font-weight: 700; color: var(--text-navy);">Dynamic B2C UPI Payment QR Code</h3>
+        <button id="upi-qr-modal-close" class="btn-icon" style="border: none; cursor: pointer;">✕</button>
+      </div>
+      <div style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 14px;">
+        Statutory dynamic QR code generated under Circular No. 146/02/2021-GST for retail invoices.
+      </div>
+
+      <div class="upi-qr-box">
+        <div class="upi-qr-image-wrapper">
+          <img id="upi-qr-image" src="" alt="UPI Dynamic QR Code" width="180" height="180">
+        </div>
+        <div id="upi-qr-amount-text" style="font-size: 1.25rem; font-weight: 800; color: var(--primary-navy); margin-bottom: 4px;">
+          ₹0.00
+        </div>
+        <div id="upi-qr-vpa-text" style="font-size: 0.82rem; color: var(--text-muted); font-family: monospace;">
+          payee@upi
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="upi-merchant-vpa">Payee UPI ID (VPA):</label>
+        <input type="text" id="upi-merchant-vpa" class="form-control form-control-mono" value="accounts@icici">
+      </div>
+
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 16px;">
+        <button type="button" id="btn-copy-upi-uri" class="btn btn-secondary btn-sm">📋 Copy UPI Intent URI</button>
+        <button type="button" id="btn-refresh-upi-qr" class="btn btn-primary btn-sm">Regenerate QR</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Keyboard Shortcuts Cheatsheet Modal -->
+  <div id="shortcuts-modal" class="modal-overlay">
+    <div class="modal-box" style="max-width: 520px;">
+      <div class="modal-header">
+        <h3 style="font-size: 1.05rem; font-weight: 700; color: var(--text-navy);">⌨️ CA Workstation Keyboard Shortcuts</h3>
+        <button id="shortcuts-modal-close" class="btn-icon" style="border: none; cursor: pointer;">✕</button>
+      </div>
+      <div style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 14px;">
+        Accelerate high-volume statutory invoice audits with professional keyboard commands:
+      </div>
+
+      <table class="shortcuts-table">
+        <tbody>
+          <tr>
+            <td><span class="kbd-badge">Ctrl</span> + <span class="kbd-badge">N</span></td>
+            <td><strong>New Invoice:</strong> Clear form and start blank voucher</td>
+          </tr>
+          <tr>
+            <td><span class="kbd-badge">Ctrl</span> + <span class="kbd-badge">S</span></td>
+            <td><strong>Save Audit:</strong> Persist active invoice to local audit history</td>
+          </tr>
+          <tr>
+            <td><span class="kbd-badge">Ctrl</span> + <span class="kbd-badge">Shift</span> + <span class="kbd-badge">F</span></td>
+            <td><strong>Auto-Fix Taxes:</strong> Resolve POS tax splits &amp; rounding drift</td>
+          </tr>
+          <tr>
+            <td><span class="kbd-badge">Alt</span> + <span class="kbd-badge">A</span></td>
+            <td><strong>Add Item Row:</strong> Insert new line-item row into table</td>
+          </tr>
+          <tr>
+            <td><span class="kbd-badge">Ctrl</span> + <span class="kbd-badge">P</span></td>
+            <td><strong>Print Certificate:</strong> Open printable statutory compliance certificate</td>
+          </tr>
+          <tr>
+            <td><span class="kbd-badge">Esc</span></td>
+            <td><strong>Close Modal:</strong> Dismiss any active popup or preview window</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div style="text-align: right; margin-top: 16px;">
+        <button type="button" id="btn-shortcuts-close" class="btn btn-primary btn-sm">Got It</button>
       </div>
     </div>
   </div>
