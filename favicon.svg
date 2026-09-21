@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <defs>
+    <linearGradient id="shieldGrad" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#10b981"/>
+      <stop offset="100%" stop-color="#06b6d4"/>
+    </linearGradient>
+    <linearGradient id="innerGrad" x1="0" y1="0" x2="0" y2="64" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#0c1a24"/>
+      <stop offset="100%" stop-color="#071118"/>
+    </linearGradient>
+  </defs>
+  <path d="M32 4L10 12V28C10 44 19.5 54.5 32 60C44.5 54.5 54 44 54 28V12L32 4Z" fill="url(#shieldGrad)"/>
+  <path d="M32 8L14 15V28C14 41.5 21.8 50.8 32 55.5C42.2 50.8 50 41.5 50 28V15L32 8Z" fill="url(#innerGrad)"/>
+  <!-- Checkmark & Rupee symbology -->
+  <path d="M23 32L29 38L41 24" stroke="#10b981" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
